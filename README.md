@@ -12,6 +12,8 @@ cloning, no copying files into your project, no editing your `CLAUDE.md`.
 sutra = a house style + a methodology library, delivered as a plugin.
 ```
 
+![Sutra -- a plug-and-play agent kit for Claude Code](docs/demo.gif)
+
 ---
 
 ## Install
