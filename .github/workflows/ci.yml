@@ -17,10 +17,10 @@ jobs:
 
       - name: Files are ASCII-only
         run: |
-          if LC_ALL=C grep -rlP '[^\x00-\x7F]' --exclude-dir=.git . ; then
-            echo "Non-ASCII bytes found in the files listed above."; exit 1
+          if LC_ALL=C grep -rlIP '[^\x00-\x7F]' --exclude-dir=.git . ; then
+            echo "Non-ASCII bytes found in the text files listed above."; exit 1
           fi
-          echo "All files are ASCII."
+          echo "All text files are ASCII (binary files skipped)."
 
       - name: JSON manifests are valid
         run: |
