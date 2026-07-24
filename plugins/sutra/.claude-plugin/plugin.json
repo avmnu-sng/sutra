@@ -1,0 +1,19 @@
+{
+  "name": "sutra",
+  "description": "A senior-engineer operating system for Claude Code -- architecture review, verification discipline, multi-session build orchestration, doc sanitization, and commit craft, delivered as skills, subagents, and layered lite/standard/strict profiles.",
+  "version": "0.1.0",
+  "author": {
+    "name": "avmnu-sng"
+  },
+  "homepage": "https://github.com/avmnu-sng/sutra",
+  "repository": "https://github.com/avmnu-sng/sutra",
+  "license": "MIT",
+  "keywords": [
+    "agent-kit",
+    "claude-code",
+    "methodology",
+    "skills",
+    "subagents",
+    "workflows"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "sutra",
+  "owner": {
+    "name": "avmnu-sng"
+  },
+  "description": "Sutra -- a plug-and-play agent kit for Claude Code: senior-engineer methodologies, skills, subagents, and layered operating profiles.",
+  "plugins": [
+    {
+      "name": "sutra",
+      "source": "./plugins/sutra",
+      "description": "A senior-engineer operating system for Claude Code: architecture-review, verification, multi-session build, doc-sanitization, and commit-craft skills and subagents, plus layered lite/standard/strict profiles.",
+      "category": "workflow",
+      "keywords": [
+        "agent-kit",
+        "claude-code",
+        "methodology",
+        "skills",
+        "subagents",
+        "workflows",
+        "code-review",
+        "architecture"
+      ],
+      "tags": [
+        "agent-kit",
+        "claude-code",
+        "methodology",
+        "profiles"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+# CLAUDE.md
+
+<!--
+  This is a TEMPLATE. Copy it to your repo root as `CLAUDE.md`, delete the
+  parts you do not need, and replace every PLACEHOLDER path/value below.
+
+  What this file is for:
+  Adopting the `sutra` profile in-repo so that teammates who have NOT
+  installed the sutra plugin still pick up its guidance automatically when
+  they open this project in Claude Code.
+
+  You usually do NOT need this file.
+  If the sutra plugin is installed in a teammate's Claude Code, the profile
+  is already active for them globally -- no CLAUDE.md change is required.
+  Use the in-repo approach below only when you want the profile to travel
+  WITH the repository (e.g. for contributors who have not installed the
+  plugin, or for CI/agent runs that start from a clean checkout).
+-->
+
+<!--
+  OPTION A -- @import a vendored/submoduled profile.
+
+  Vendor the sutra repo into your project (git submodule, subtree, or a
+  plain clone under a `vendor/` directory), then import the profile file
+  you want. The line below pulls the "standard" profile; swap the filename
+  for another profile (for example `strict.md`) to change the ruleset.
+
+  IMPORTANT: @import resolves LOCAL PATHS ONLY. It cannot fetch a URL or a
+  remote git ref. The path must exist on disk relative to this file at the
+  time Claude Code reads it. Keep the vendored copy checked in (or wired up
+  as a submodule your teammates initialize) so the path always resolves.
+
+  Replace the PLACEHOLDER path with wherever you vendored sutra.
+-->
+@vendor/sutra/plugins/sutra/profiles/standard.md
+
+<!--
+  OPTION B -- pick the profile with a `.sutra` marker file (plugin users).
+
+  If teammates DO have the sutra plugin installed, you can skip the @import
+  entirely. Instead, drop a file named `.sutra` at the repo root whose only
+  contents are the profile name, for example:
+
+      strict
+
+  The plugin reads that marker and applies the named profile to this repo.
+  This is the lightest-touch option, but it only affects people who already
+  have the plugin -- it does nothing for a clean checkout without the plugin.
+
+  Rule of thumb:
+    - Want the profile to work for everyone, plugin or not -> Option A.
+    - Everyone on the team has the plugin -> Option B (a one-line `.sutra`).
+  Do not use both at once; pick one so there is a single source of truth.
+-->
+
+## Project specifics
+
+<!--
+  Everything above wires in the shared profile. Everything below is YOURS.
+  Add the project-local context an agent needs to be useful here. Delete the
+  sample bullets and fill in real values.
+-->
+
+- Build: `<PLACEHOLDER build command, e.g. make build>`
+- Test: `<PLACEHOLDER test command, e.g. make test>`
+- Lint/format: `<PLACEHOLDER lint command, e.g. make lint>`
+- Run locally: `<PLACEHOLDER run command, e.g. make dev>`
+
+### Conventions
+
+- `<PLACEHOLDER convention, e.g. Conventional Commits for all commit messages>`
+- `<PLACEHOLDER convention, e.g. feature branches only; never push to main>`
+- `<PLACEHOLDER convention, e.g. every new module ships with unit tests>`
+
+### Layout
+
+- `<PLACEHOLDER path>` -- `<PLACEHOLDER what lives here, e.g. src/ application code>`
+- `<PLACEHOLDER path>` -- `<PLACEHOLDER what lives here, e.g. tests/ test suites>`

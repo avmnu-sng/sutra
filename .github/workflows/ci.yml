@@ -1,0 +1,60 @@
+name: ci
+
+# Dogfooding gate: the guardrails Sutra preaches, enforced on Sutra itself.
+# Self-contained structural checks -- no secrets. Run `claude plugin validate`
+# locally (a schema check; see CONTRIBUTING.md); CI covers the rest.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Files are ASCII-only
+        run: |
+          if LC_ALL=C grep -rlP '[^\x00-\x7F]' --exclude-dir=.git . ; then
+            echo "Non-ASCII bytes found in the files listed above."; exit 1
+          fi
+          echo "All files are ASCII."
+
+      - name: JSON manifests are valid
+        run: |
+          for f in .claude-plugin/marketplace.json \
+                   plugins/sutra/.claude-plugin/plugin.json \
+                   plugins/sutra/hooks/hooks.json \
+                   examples/settings.json; do
+            jq -e . "$f" >/dev/null || { echo "Invalid JSON: $f"; exit 1; }
+          done
+          echo "All JSON valid."
+
+      - name: YAML examples parse
+        run: |
+          python3 -c "import yaml, glob
+          for f in glob.glob('examples/**/*.yaml', recursive=True):
+              yaml.safe_load(open(f)); print('ok', f)"
+
+      - name: Hook scripts have valid shell syntax
+        run: |
+          for s in $(find . -name '*.sh' -not -path './.git/*'); do
+            bash -n "$s" || { echo "Syntax error: $s"; exit 1; }
+          done
+          echo "All shell scripts parse."
+
+      - name: Skills and agents declare frontmatter
+        run: |
+          fail=0
+          for f in plugins/sutra/skills/*/SKILL.md; do
+            head -1 "$f" | grep -q '^---$' || { echo "Missing frontmatter: $f"; fail=1; }
+            grep -q '^description:' "$f" || { echo "Missing description: $f"; fail=1; }
+          done
+          for f in plugins/sutra/agents/*.md; do
+            head -1 "$f" | grep -q '^---$' || { echo "Missing frontmatter: $f"; fail=1; }
+            grep -q '^name:' "$f" || { echo "Missing name: $f"; fail=1; }
+            grep -q '^description:' "$f" || { echo "Missing description: $f"; fail=1; }
+          done
+          [ "$fail" -eq 0 ] && echo "All skills and agents have frontmatter." || exit 1

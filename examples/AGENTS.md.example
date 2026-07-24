@@ -1,0 +1,91 @@
+# AGENTS.md
+
+> Starting template. Copy this to your repository root as `AGENTS.md` and
+> adapt every placeholder (`<...>`) to your project. Delete the notes you
+> do not need. This file is read by coding agents at the start of a task.
+
+<!-- NOTE ------------------------------------------------------------------
+sutra ships the *operating profile* -- the general working style, review
+posture, and safety defaults an agent applies everywhere -- through its
+plugin. Install the plugin (or, if you vendor a copy, add a local import
+such as `@vendor/sutra/plugins/sutra/profiles/standard.md`) so this file
+does NOT have to restate
+generic agent behavior.
+
+Keep THIS file focused on what is specific to THIS repository: the exact
+commands, the invariants a newcomer would not guess, and where to look
+things up. Generic guidance belongs in the profile, not here.
+--------------------------------------------------------------------------->
+
+Operating profile: provided by sutra (plugin or local `@import`). This file
+holds project-specific guardrails only.
+
+## Build and test
+
+Use the task runner. It bakes in the right environment, flags, and
+preconditions -- raw commands skip those and drift from what CI runs.
+
+- `<runner> check` -- fast feedback loop (lint + unit tests). Keep it quick.
+- `<runner> test` -- full test suite.
+- `<runner> lint` -- linters and formatters.
+- `<runner> build` -- produce the build artifact.
+- `<runner> --list` -- full catalog of tasks.
+
+<!-- NOTE: Replace `<runner>` with your actual entry point (for example a
+Taskfile target, `make`, `just`, or an `npm`/`pnpm` script). Prefer the
+runner over raw `<tool> <args>`; only reach past it for targeted debugging,
+then re-run the task before you commit. -->
+
+## Working agreement / invariants (example -- replace with your project's)
+
+Example invariants a newcomer would not guess. Swap these for the rules
+that actually bind changes in your repo:
+
+- **Never weaken a test to make it pass.** If a test goes red, find the
+  real cause. Do not loosen an assertion, add a blanket skip, or delete a
+  case to get to green.
+- **Keep each branch/PR focused on one logical change** so it reviews
+  cleanly. Some teams squash to a single commit; others keep a reviewable
+  commit sequence -- follow your project's merge convention.
+- **Do not commit planning or agent-only files.** Scratch notes, task
+  breakdowns, and session logs stay local (see `.gitignore`). Never stage
+  them, even under a "commit everything" instruction.
+
+<!-- Some teams enforce ASCII-only files (sutra's strict profile does); if
+yours does, state it here and verify with `file <path>`. -->
+
+<!-- NOTE: Add project-specific invariants a newcomer could not guess -- a
+required column order, a cache byte layout to preserve, a load-order
+dependency, an env var that must be unset in a subprocess, etc. These are
+the highest-value lines in the file. -->
+
+## Existing-codebase edit discipline
+
+When editing code that already exists:
+
+- **Match the surrounding style.** Follow the conventions of the file and
+  module you are in, not your own defaults.
+- **Keep diffs minimal.** Change only what the task requires. A small,
+  legible diff is easier to review and to revert.
+- **No drive-by refactors.** Do not rename, reformat, reorder, or
+  restructure code unrelated to the task. If you spot something worth
+  fixing, note it separately rather than folding it into this change.
+
+## Where things live
+
+Pointers so an agent can orient without guessing:
+
+- Plan / roadmap: `<path-to-plan>`
+- Architecture notes: `<path-to-architecture-doc>`
+- Contribution guide: `<path-to-contributing-doc>`
+- Runner / task definitions: `<path-to-taskfile-or-makefile>`
+- CI configuration: `<path-to-ci-config>`
+
+<!-- NOTE: Point at what is real in this repo and delete the rest. Prefer
+paths that stay stable over links that rot. -->
+
+---
+
+This is a starting template -- adapt it to your project and keep it short.
+A guardrail no one maintains is worse than none. Revisit it when the build
+commands, invariants, or layout change.

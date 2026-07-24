@@ -1,0 +1,226 @@
+# setup.yaml -- agent-bootstrap manifest
+#
+# A machine-readable description of a repository that an autonomous coding
+# agent reads FIRST, before touching any code, to learn how to build, run,
+# test, and navigate the project.
+#
+# This file is a TEMPLATE. Copy it into your repo (conventionally at the
+# repo root or under `examples/`) and replace every `<placeholder>` token
+# with a real value. Delete sections that do not apply. Keep it in sync
+# with the project as commands and layout change -- a stale manifest is
+# worse than none.
+#
+# Conventions used below:
+#   - `<angle-bracket>` tokens are placeholders you MUST replace.
+#   - All paths are relative to the repo root unless stated otherwise.
+#   - Commands are literal shell strings the agent can run as-is.
+
+# ---------------------------------------------------------------------------
+# Identity -- what this repo is, in one breath.
+# ---------------------------------------------------------------------------
+project:
+  name: "<project-name>"
+  # One sentence. What does this repo produce and for whom?
+  description: "<one-line description of what this project does>"
+  # Primary implementation language(s), most-used first.
+  languages:
+    - "<language>"        # e.g. the main runtime language
+    - "<language>"        # e.g. a secondary language, or delete
+  # How the repo is laid out: monorepo | single-package | library | service.
+  repo_kind: "<monorepo | single-package | library | service>"
+  # Where the primary source lives, relative to root.
+  source_root: "<src>"
+
+# ---------------------------------------------------------------------------
+# Prerequisites -- what must exist on the machine before setup can run.
+# Pin versions. "latest" is not a version.
+# ---------------------------------------------------------------------------
+prerequisites:
+  # Language runtimes and their required versions.
+  runtimes:
+    - name: "<runtime>"           # e.g. the language runtime
+      version: "<x.y.z>"          # exact or range, e.g. ">=1.2 <2"
+      # How the agent should check it is present.
+      check: "<runtime> --version"
+  # Package / dependency managers.
+  package_managers:
+    - name: "<package-manager>"
+      version: "<x.y.z>"
+      check: "<package-manager> --version"
+  # System-level tools the build shells out to.
+  system_tools:
+    - name: "<tool>"              # e.g. a container runtime, a compiler
+      check: "<tool> --version"
+  # Services that must be reachable for the app to boot (may be local
+  # containers). List host+port as placeholders; see `ports:` below.
+  services:
+    - name: "<datastore>"         # e.g. a relational or key-value store
+      required: true
+      note: "<how it is provisioned locally, e.g. via the container stack>"
+
+# ---------------------------------------------------------------------------
+# Setup steps -- deterministic, ordered, idempotent where possible.
+# Running these top-to-bottom on a clean checkout must yield a working tree.
+# ---------------------------------------------------------------------------
+setup_steps:
+  - name: "Install dependencies"
+    run: "<package-manager> install"
+  - name: "Copy environment template"
+    run: "cp .env.example .env"
+    note: "Fill in the <placeholder> tokens (see `placeholders:` below)."
+  - name: "Start backing services"
+    run: "<command to start local services, e.g. the container stack>"
+  - name: "Initialize schema / migrate"
+    run: "<migration command>"
+  - name: "Seed baseline data"
+    run: "<seed command>"
+    optional: true
+  - name: "Verify the setup"
+    run: "<smoke command that exits non-zero on a broken tree>"
+
+# ---------------------------------------------------------------------------
+# Commands -- the canonical entry points. Prefer the project's task runner
+# over raw tool invocations so baked-in env and guards apply.
+# ---------------------------------------------------------------------------
+commands:
+  # Start the app for local development (watch mode, hot reload, etc.).
+  dev:
+    steps:
+      - name: "Run the app"
+        run: "<dev server command>"
+      - name: "Run a background worker"
+        run: "<worker command>"
+        optional: true
+
+  # Automated tests, most-used first.
+  test:
+    steps:
+      - name: "Unit tests -- fast inner loop"
+        run: "<unit test command>"
+      - name: "Integration tests"
+        run: "<integration test command>"
+      - name: "Full suite"
+        run: "<full test command>"
+    # A single-target invocation the agent can adapt to run one file/case.
+    single: "<test command> <path-or-pattern>"
+
+  # Static analysis and formatting. `fix` mutates files; `check` is read-only.
+  lint:
+    steps:
+      - name: "Lint (report only)"
+        run: "<lint command>"
+      - name: "Lint (auto-fix)"
+        run: "<lint fix command>"
+      - name: "Format"
+        run: "<format command>"
+      - name: "Type check"
+        run: "<type check command>"
+
+  # Production build / package.
+  build:
+    steps:
+      - name: "Build"
+        run: "<build command>"
+
+# ---------------------------------------------------------------------------
+# Ports -- what listens where when the app runs locally. The agent uses
+# this to probe readiness and avoid collisions.
+# ---------------------------------------------------------------------------
+ports:
+  - name: "app-http"
+    number: "<8080>"
+    protocol: "http"
+    note: "Primary application endpoint."
+  - name: "datastore"
+    number: "<5432>"
+    protocol: "tcp"
+    note: "Local backing store."
+  - name: "metrics"
+    number: "<9090>"
+    protocol: "http"
+    optional: true
+
+# ---------------------------------------------------------------------------
+# Dependent repos -- sibling repositories this one builds/tests against.
+# Clone them next to this repo (or at `path`) before cross-repo work.
+# ---------------------------------------------------------------------------
+dependent_repos:
+  - name: "<shared-library-repo>"
+    url: "<git-remote-url>"
+    # Where the agent should expect it checked out, relative to this repo.
+    path: "../<shared-library-repo>"
+    relationship: "<compile-time dependency | runtime service | test fixture>"
+  - name: "<downstream-consumer-repo>"
+    url: "<git-remote-url>"
+    path: "../<downstream-consumer-repo>"
+    relationship: "<consumes this repo's published artifact>"
+
+# ---------------------------------------------------------------------------
+# Placeholders -- tokens the reader must substitute after copying this file.
+# Each entry documents what to put there and where to get it. NEVER commit
+# real secret values; secrets belong in an ignored .env or a secret store.
+# ---------------------------------------------------------------------------
+placeholders:
+  - token: "<project-name>"
+    describes: "Human-readable name of the project."
+  - token: "<git-remote-url>"
+    describes: "Clone URL for a dependent repo."
+  - token: "<db-connection-string>"
+    describes: "Connection string for the local datastore."
+    secret: true
+    source: "Provisioned by the local service stack; see setup_steps."
+  - token: "<api-token>"
+    describes: "Token for any external API the app calls in dev."
+    secret: true
+    source: "Request from the service owner; store in .env, never commit."
+
+# ---------------------------------------------------------------------------
+# skills_by_key -- routes a task keyword to the skill an agent should load
+# before doing that kind of work. Match on the most specific keyword first;
+# fall back to `default`.
+# ---------------------------------------------------------------------------
+skills_by_key:
+  test: "<skill: authoring and strengthening tests>"
+  lint: "<skill: applying and interpreting the linter>"
+  migration: "<skill: writing and running schema migrations>"
+  release: "<skill: cutting a versioned release>"
+  dependency: "<skill: adding or upgrading a dependency safely>"
+  docs: "<skill: writing user-facing documentation>"
+  default: "<skill: general repository conventions>"
+
+# ---------------------------------------------------------------------------
+# feature_areas -- maps a source-path PREFIX to a domain label, so an agent
+# can answer "which domain does this file belong to?" by longest-prefix
+# match. `default` is the catch-all for paths no prefix covers.
+# ---------------------------------------------------------------------------
+feature_areas:
+  "<src>/api/": "public interface"
+  "<src>/core/": "domain logic"
+  "<src>/data/": "persistence"
+  "<src>/jobs/": "background processing"
+  "<src>/ui/": "presentation"
+  "<src>/cli/": "command-line entry points"
+  "test/": "test suites"
+  "docs/": "documentation"
+  default: "uncategorized"
+
+# ---------------------------------------------------------------------------
+# canonical_docs -- name -> path pointers to the documents and exemplar
+# files an agent should read to understand conventions. `ground_truth`
+# names the ONE authoritative doc: when sources disagree, it wins.
+# ---------------------------------------------------------------------------
+canonical_docs:
+  ground_truth: "architecture"      # key below that is authoritative
+  docs:
+    architecture: "docs/ARCHITECTURE.md"     # system design, invariants
+    contributing: "docs/CONTRIBUTING.md"     # workflow, PR rules
+    conventions: "docs/CONVENTIONS.md"       # code style and naming
+    glossary: "docs/GLOSSARY.md"             # domain vocabulary
+
+# exemplar_files -- name -> path. Copy the shape of these when adding new
+# code of the same kind; they encode the intended patterns.
+exemplar_files:
+  service: "<src>/core/<example_service_file>"
+  test: "test/<example_test_file>"
+  migration: "<src>/data/migrations/<example_migration_file>"
+  config: "config/<example_config_file>"

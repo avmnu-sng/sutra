@@ -1,0 +1,181 @@
+# Quickstart
+
+See Sutra work once, end to end, in about ten minutes. You will install the
+plugin, start a session that picks up its operating profile, run a skill on a
+tiny throwaway repo, and watch the strict-profile ASCII warning fire without
+ever blocking a write.
+
+No real project required. We will use a toy service called `snippet-store` --
+a single-process HTTP app with two routes (`POST /snippets` to save text,
+`GET /snippets/:id` to read it back) sitting on one SQLite file. Invent it as
+you read; nothing here depends on code that actually exists.
+
+## 1. Install (2 commands)
+
+Open any Claude Code session and run:
+
+```
+/plugin marketplace add avmnu-sng/sutra
+/plugin install sutra@sutra
+```
+
+The first command registers the Sutra marketplace with your Claude Code
+install -- it only tells Claude Code where to find the plugin. The second
+installs the `sutra` plugin from that marketplace. That is the whole install:
+no clone, no copied files, no edits to your `CLAUDE.md`.
+
+If `/plugin` is not recognized, your Claude Code build is too old -- update it
+and retry.
+
+## 2. Start a fresh session and see the profile
+
+Skills and the operating profile register at session start, not mid-session.
+So start a new session (or restart Claude Code).
+
+At the top of the new session, Sutra's `SessionStart` hook prints the active
+operating profile to stdout, and Claude Code folds that text into context. You
+have not set a profile yet, so you get the default, `standard`. In context you
+will see a block that opens like this:
+
+```
+# Sutra profile: standard
+
+The default operating stance: a senior engineer who traces before theorizing,
+thinks in systems, quantifies trade-offs, and owns the outcome...
+```
+
+That block is the contract for the whole session. Nothing was written to your
+repo to make it appear -- it lives only in the session context. To confirm it
+took hold, ask the agent a quick question:
+
+```
+What operating profile are you running, and name two rules it puts on you.
+```
+
+You should get `standard` plus two of its principles (for example: trace the
+real code path before theorizing, and quantify trade-offs with numbers).
+
+## 3. Pick a profile
+
+Three layered profiles ship, each a superset of the one below: `lite`,
+`standard` (default), and `strict`. Select one two ways, with env winning
+over file winning over the default:
+
+```bash
+# Globally, for this shell:
+export SUTRA_PROFILE=strict
+```
+
+```bash
+# Or per project, checked into the repo root:
+echo strict > .sutra
+```
+
+The `.sutra` file is a single line -- just the profile name, no quotes. Set
+either to `off` to inject nothing while keeping the skills installed.
+
+For the rest of this walkthrough, turn on `strict` so you can see its one
+guardrail later:
+
+```bash
+export SUTRA_PROFILE=strict
+```
+
+Start a new session so the hook re-reads it. Now the injected block opens with
+`# Sutra profile: strict`, which adds the publishing and hygiene rules on top
+of everything in `standard`.
+
+## 4. Invoke a skill on the toy service
+
+Skills are invocable methodologies, addressed as `/sutra:<name>`. Point one at
+`snippet-store`. Describe the toy service to the agent, then run:
+
+```
+/sutra:architecture-review
+
+Here is snippet-store: a single Node process, two routes -- POST /snippets
+writes a row, GET /snippets/:id reads one -- backed by one SQLite file on
+local disk. Review it.
+```
+
+`architecture-review` runs a 7-point pass rather than a vibe check. Watch it:
+
+1. Trace a request end to end -- HTTP in, the SQLite write, the response out.
+2. Question the choke points -- here, every write goes through one SQLite
+   file with a single writer lock.
+3. Stress it at 2x, 5x, and 10x load. The read path scales; the write path
+   serializes on that one lock and is the first thing to fall over.
+4. Separate elastic work (stateless reads) from rate-limited work (the
+   serialized writer) and propose splitting them.
+5. Weigh the deployment model -- one process on local disk means no
+   horizontal scale and no durability story.
+6. Quantify the fix -- what a move to a networked store with a connection
+   pool buys you, at what cost, versus staying put.
+7. Land a verdict with numbers, not adjectives.
+
+You end up with a concrete review: the SQLite writer is the ceiling, reads are
+fine, and here is the ROI of changing it -- not "looks scalable."
+
+Prefer something smaller? Try a completeness sweep instead. Say you renamed a
+helper from `getSnippet` to `fetchSnippet` and want every caller updated:
+
+```
+/sutra:verify-completeness
+
+I renamed getSnippet to fetchSnippet. Find every remaining reference and fix
+each one.
+```
+
+It turns the search into a checklist, fixes each hit, then re-searches until
+the list is empty -- so no stray caller survives the rename.
+
+## 5. See the strict guardrail
+
+Under `strict`, Sutra adds one -- and only one -- active guardrail, and it is
+advisory: a non-blocking ASCII warning on writes. Trigger it. Ask the agent to write a
+file that contains a real non-ASCII character, such as a Unicode em dash
+(U+2014) or a curly quote, rather than the ASCII `--`:
+
+```
+Write a file notes.md whose first heading uses a real Unicode em dash
+character, not two hyphens.
+```
+
+The write goes through and the file lands on disk. Then a system message like
+this appears:
+
+```
+sutra(strict): non-ASCII byte in notes.md (first at line 1). Prefer ASCII:
+-- for an em dash, -> for an arrow, plain quotes. Set SUTRA_PROFILE=standard
+to silence.
+```
+
+Read that carefully: it points at the file and the first offending line, and
+it suggests the ASCII substitutes. It does **not** block, cancel, or rewrite
+the write -- the file is already there. That is the invariant: profiles add
+guidance, they never change what a write is allowed to do. The lone ASCII
+warning is advisory too; it just surfaces the byte and keeps going. If you
+want a hard gate, build it outside Sutra (a pre-commit check or CI).
+
+To silence the warning, drop back to a lower profile and start a new session:
+
+```bash
+export SUTRA_PROFILE=standard
+```
+
+## 6. Where next
+
+You have seen the whole loop: install, profile-in-context, a skill on a real
+task, and the strict guardrail. From here:
+
+- [`docs/skills.md`](skills.md) -- the full skills catalog and a decision map
+  that routes each task to the one skill that fits (and names the sibling to
+  reach for instead when two overlap).
+- [`docs/profiles.md`](profiles.md) -- the three profiles in depth, the
+  resolution order, and the complete principle-to-profile mapping table.
+- [`README.md`](../README.md) -- the overview: what ships in the kit (skills,
+  subagents, profiles, workflows, examples) and how it all composes.
+
+When you want the operating contract to travel in git for teammates who have
+not installed the plugin, see [`docs/install.md`](install.md) for the
+`@import`-a-profile path.
