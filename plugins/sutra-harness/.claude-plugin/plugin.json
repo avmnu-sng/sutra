@@ -1,0 +1,31 @@
+{
+  "name": "sutra-harness",
+  "description": "The automatic half of Sutra: a layered operating contract at session start, short rule cards when they apply, hidden-Unicode warnings, a compaction brief, a verify-before-stop nudge under the strict profile, and the build-orchestrator workflow. Runs one Bash hook script, and installs the sutra skills plugin as a dependency.",
+  "version": "0.2.0",
+  "author": {
+    "name": "avmnu-sng"
+  },
+  "homepage": "https://github.com/avmnu-sng/sutra",
+  "repository": "https://github.com/avmnu-sng/sutra",
+  "license": "MIT",
+  "icon": "./assets/icon.png",
+  "dependencies": [
+    "sutra"
+  ],
+  "userConfig": {
+    "profile": {
+      "type": "string",
+      "title": "Sutra profile",
+      "description": "lite, standard, strict, or off. Empty means standard, which a repository's .sutra file may raise to strict. The SUTRA_PROFILE environment variable overrides this setting.",
+      "default": ""
+    }
+  },
+  "keywords": [
+    "agent-kit",
+    "claude-code",
+    "hooks",
+    "profiles",
+    "workflows",
+    "security"
+  ]
+}

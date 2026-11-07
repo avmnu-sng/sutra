@@ -1,12 +1,12 @@
 ---
-description: Scaffold a repeatable execution-plan structure (master plan, session protocol, dev loop, slice index, and per-slice templates) for a large, multi-session build that must survive across many sessions, for the /sutra:build-orchestrator workflow to drive.
+description: Scaffold a repeatable execution-plan structure (master plan, session protocol, dev loop, slice index, and per-slice templates) for a large, multi-session build that must survive across many sessions, for the /sutra-harness:build-orchestrator workflow to drive.
 disable-model-invocation: true
 ---
 
 # Scaffold execution plan
 
 Lay down a durable, resumable structure for a build too large for one
-session, for the `/sutra:build-orchestrator` workflow to drive. The
+session, for the `/sutra-harness:build-orchestrator` workflow to drive. The
 structure is the source of truth across sessions: what to build next, in
 what order, and what "done" means for each unit of work.
 
@@ -78,12 +78,16 @@ execution_plan/
   handoffs/          (one handoff per completed slice)
 ```
 
-The orchestrator ships with this plugin and runs as
-`/sutra:build-orchestrator` (Step 3); there is nothing to copy.
-`${CLAUDE_PLUGIN_ROOT}` is this plugin's root at runtime. To change the
-orchestrator's prompts, stages, or plan format, follow the Customize section
-of `${CLAUDE_PLUGIN_ROOT}/workflows/README.md`; a project copy runs as
-`/build-orchestrator` and no longer changes when the plugin updates.
+The orchestrator ships in the `sutra-harness` plugin, from the same
+marketplace as this one, and runs as `/sutra-harness:build-orchestrator`
+(Step 3); there is nothing to copy. Without the harness, run the slices by
+hand, one session each, under `SESSION_PROTOCOL.md`. To change the
+orchestrator's prompts, stages, or plan format, copy
+`workflows/build-orchestrator.workflow.js` from the installed `sutra-harness`
+plugin into the project's `.claude/workflows/` and edit it there. Keep
+`export const meta` the first statement and a plain object literal, and run
+`/reload-skills` after editing. The copy runs as `/build-orchestrator` and no
+longer changes when the plugin updates.
 
 ## Step 2 -- copy and adapt the templates
 
@@ -152,7 +156,7 @@ enforced, not merely documented.
 
 ## Step 3 -- run it
 
-Run `/sutra:build-orchestrator` in the target project, from the build
+Run `/sutra-harness:build-orchestrator` in the target project, from the build
 branch or worktree (`/build-orchestrator` for a customized copy). It reads
 `execution_plan/sessions/INDEX.md`, selects every non-DONE slice in listed
 order, and drives each through the build -> review -> fix -> validate ->
@@ -170,21 +174,21 @@ Resume is mechanical, driven by INDEX status -- never by recall.
 - A run stops at the first slice that does not validate, leaves that slice's
   changes uncommitted, and starts no later slice. Finish the slice and commit
   it with its row set to DONE, or discard its changes, then run again; a run
-  refuses to start on a dirty tree. The Resume section of
-  `${CLAUDE_PLUGIN_ROOT}/workflows/README.md` covers each case.
+  refuses to start on a dirty tree. The Resume section of the `sutra-harness`
+  plugin's `workflows/README.md` covers each case.
 - After a run that completes, the next run starts at the first row that is not
   DONE -- no bookkeeping beyond keeping the INDEX honest.
 
 ## Gates: where a person steps in
 
-A `/sutra:build-orchestrator` run does not pause between slices. It drives
-every remaining slice through every stage and commits each one that
+A `/sutra-harness:build-orchestrator` run does not pause between slices. It
+drives every remaining slice through every stage and commits each one that
 validates. A person steps in when the run ends, complete or stopped at a slice
 that did not validate: read the run's summary and the stage output in
 `/workflows`, make the call it needs, and run it again.
 
 `SESSION_PROTOCOL.md` governs sessions run by hand, one slice each, with a
-human gate between them. Under `/sutra:build-orchestrator`, that gate is
+human gate between them. Under `/sutra-harness:build-orchestrator`, that gate is
 replaced by the workflow's rule of stopping at the first slice that does not
 validate. Start a run only when each validated slice may be committed without
 a person reading it first; to review every slice before the next one starts,
@@ -269,5 +273,5 @@ Do NOT:
 - [ ] Release milestones grouped with a version/tag scheme, and cut
       criteria filled or explicitly marked TODO.
 - [ ] No project specifics invented -- every unknown is a visible TODO.
-- [ ] `/sutra:build-orchestrator` (or a customized copy, run as
+- [ ] `/sutra-harness:build-orchestrator` (or a customized copy, run as
       `/build-orchestrator`) launched from the build branch or worktree.

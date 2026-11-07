@@ -126,7 +126,7 @@ lands in-slice or the milestone is marked `BLOCKED` -- never `DONE` with an
 asterisk. That is the whole bar.
 
 This gate, the adversarial-review gate (3), and the ledgers it checks (gates
-1 and 5) already ship as running code. The `/sutra:build-orchestrator`
+1 and 5) already ship as running code. The `/sutra-harness:build-orchestrator`
 workflow's review and validate stages run them as separate agents: a fresh
 validator walks each criterion in order, re-runs its tests and invariants
 firsthand rather than trusting a green report, and returns DONE only on zero

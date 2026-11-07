@@ -6,6 +6,75 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Sutra is now two plugins, so that its skills can be listed in Anthropic's
+plugin directory, which accepts hooks, workflow scripts, and files other than
+Markdown, text, JSON, YAML, and a few image types only from Verified
+organizations.
+
+### Changed
+
+- **Breaking:** the hooks, the contract layers (`profiles/`), the rule cards,
+  and the build-orchestrator workflow moved from `sutra` to a new plugin in
+  the same marketplace, `sutra-harness`, which depends on `sutra`. Updating
+  `sutra` removes them; install the harness to keep the contract, the cards,
+  the security floor, and the stop gate:
+
+  ```
+  /plugin marketplace update sutra
+  /plugin install sutra-harness@sutra
+  ```
+
+  A marketplace pinned to `v0.2.0` stays on that tag, which has no
+  `sutra-harness`; move the pin first (`docs/install.md`, Updating).
+- **Breaking:** the workflow runs as `/sutra-harness:build-orchestrator`.
+- **Breaking:** the `profile` setting moved to `sutra-harness`. If you had set
+  it on `sutra`, set it again with
+  `claude plugin configure sutra-harness@sutra`. `SUTRA_PROFILE` and `.sutra`
+  work as before.
+- **Breaking:** the contract layers moved to
+  `plugins/sutra-harness/profiles/`. If your `CLAUDE.md` imports them from a
+  vendored copy, change each `@<path>/plugins/sutra/profiles/<layer>.md` to
+  `@<path>/plugins/sutra-harness/profiles/<layer>.md`; the old paths no
+  longer exist, so the contract stops loading until you do.
+- `sutra` is Markdown only: twenty skills, four read-only subagents, and the
+  icon.
+- The harness keeps its markers in its own plugin data directory. The 0.2.0
+  markers under `~/.claude/plugins/data/sutra-sutra/` are no longer read and
+  can be deleted.
+- Reworded hooks-cookbook, agent-security, and session-protocol prose that
+  read as code fetching remote scripts or using your credentials; the
+  guidance is unchanged.
+- `scaffold-execution-plan` and `parallel-agent-orchestration` name the
+  harness's workflow README instead of a `${CLAUDE_PLUGIN_ROOT}` path, which
+  resolves to `sutra` inside a skill, and no longer link to it on the web.
+- `architecture-reviewer` and `code-verifier` preload the skill they apply,
+  instead of telling a subagent without the Skill tool to load it.
+
+### Added
+
+- `sutra-harness` has its own README disclosing what it runs, reads, and
+  writes, a LICENSE, and the icon.
+- `scripts/check.sh` checks `manifests` (each marketplace entry matches its
+  plugin folder, each dependency names a plugin in the marketplace, both
+  plugins carry one version, and `CHANGELOG.md` has a section for it) and
+  `directory-policy` (`plugins/sutra` holds only the file types and names the
+  directory accepts, with no hook, workflow, server, load-time shell command,
+  or package manager file, and no manifest key that can run code).
+- CI validates each plugin, and `sutra` against the directory profile.
+
+### Fixed
+
+- Invoking `/sutra:hooks-cookbook` or `/sutra:agent-security` with arguments
+  no longer corrupts their example code: Claude Code replaces `$1` in a skill
+  with an argument, so the examples write `${1}`.
+- The hooks-cookbook wiring example no longer shows Claude a path into the
+  installed `sutra`: Claude Code substitutes the plugin-root variable in a
+  skill, so the literal line moved to `reference/recipes.md`.
+- The agent-security threat reference credits the hidden-Unicode warnings and
+  the untrusted-content card to `sutra-harness`, not to the skills plugin.
+- The documented `claude plugin configure` commands use the full plugin id,
+  which the command requires.
+
 ## [0.2.0] - 2026-11-07
 
 ### Added

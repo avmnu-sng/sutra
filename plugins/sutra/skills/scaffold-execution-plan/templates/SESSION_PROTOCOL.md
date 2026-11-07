@@ -42,11 +42,11 @@ slice, then load context in a fixed order:
 - **Sync the remote first, as a manual, explicit step.** You run
   `git fetch origin`, or the session runs it in plain view as the
   kickoff's first command. Nothing fetches on its own: no hook,
-  scheduled job, or background script uses your credentials to fetch
-  behind your back. The fetch updates `origin/<build-branch>` and
-  `origin/<default-branch>`; compare against those, not a stale local
-  checkout. If `<build-branch>` is behind its remote, you fast-forward
-  it (`git merge --ff-only origin/<build-branch>`) before the session
+  scheduled job, or background script fetches behind your back. The
+  fetch updates `origin/<build-branch>` and `origin/<default-branch>`;
+  compare against those, not a stale local checkout. If
+  `<build-branch>` is behind its remote, you fast-forward it
+  (`git merge --ff-only origin/<build-branch>`) before the session
   builds; the session does not pull, merge, or reset to sync.
 - **Run a staleness check.** Confirm the on-disk INDEX, handoffs, and
   briefs match the synced state. If the local tree is behind or has
@@ -137,8 +137,8 @@ starts. Do not auto-advance to the next slice, do not open the next
 session, and do not push or merge on your own initiative.
 
 This gate governs sessions run by hand, one slice each. A
-`/sutra:build-orchestrator` run replaces it with the workflow's own rule:
-the run chains every slice that is not DONE and stops at the first one
+`/sutra-harness:build-orchestrator` run replaces it with the workflow's own
+rule: the run chains every slice that is not DONE and stops at the first one
 that does not validate.
 
 - Between-session owner: TODO name the human who holds this gate.

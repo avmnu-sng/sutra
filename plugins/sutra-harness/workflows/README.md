@@ -6,13 +6,14 @@ next, which subagent to spawn, what to check in its output, when to stop), and
 the subagents do the judgment-heavy work inside each step, so the same path is
 taken on every run.
 
-Claude Code loads every script in this directory when the plugin is installed
-and namespaces it by the plugin name: `build-orchestrator.workflow.js`, whose
-`meta.name` is `build-orchestrator`, runs as `/sutra:build-orchestrator`. There
-is nothing to copy. Claude Code asks you to approve a run before it starts,
-depending on your permission mode, and `/workflows` shows its progress.
+Claude Code loads every script in this directory when the `sutra-harness`
+plugin is installed and namespaces it by the plugin name:
+`build-orchestrator.workflow.js`, whose `meta.name` is `build-orchestrator`,
+runs as `/sutra-harness:build-orchestrator`. There is nothing to copy. Claude
+Code asks you to approve a run before it starts, depending on your permission
+mode, and `/workflows` shows its progress.
 
-## /sutra:build-orchestrator
+## /sutra-harness:build-orchestrator
 
 Drives a value-ranked execution plan to completion one slice at a time. A slice
 is one PR-sized deliverable listed in `execution_plan/sessions/INDEX.md`, with a
@@ -108,8 +109,9 @@ misreports.
 
 ### Prerequisites
 
-- The sutra plugin installed, with workflows enabled in Claude Code (on Pro,
-  the Dynamic workflows row in `/config`).
+- The `sutra-harness` plugin installed (it installs `sutra` as its
+  dependency), with workflows enabled in Claude Code (on Pro, the Dynamic
+  workflows row in `/config`).
 - `execution_plan/sessions/INDEX.md` with one row per slice: id, title, status,
   brief path (relative to `execution_plan/sessions/`, for example
   `briefs/S-01.md`), and a one-line acceptance summary.
@@ -124,8 +126,9 @@ misreports.
 
 ### Resume
 
-The INDEX is the source of truth. Run `/sutra:build-orchestrator` again and it
-skips every slice already DONE and starts at the first one that is not.
+The INDEX is the source of truth. Run `/sutra-harness:build-orchestrator`
+again and it skips every slice already DONE and starts at the first one that
+is not.
 
 - **After a BLOCKED stop**, read the summary and the stage's output in
   `/workflows`. Then either finish the slice yourself, commit it, and set its
@@ -146,10 +149,10 @@ skips every slice already DONE and starts at the first one that is not.
 The plugin's copy updates with the plugin. To change the prompts, the stages,
 or the plan format, copy `build-orchestrator.workflow.js` into your project's
 `.claude/workflows/` and edit it there. The copy runs as `/build-orchestrator`,
-beside the plugin's `/sutra:build-orchestrator`. Keep `export const meta` the
-first statement and a plain object literal (no variables, function calls,
-spreads, or string concatenation), or Claude Code drops the command from `/`
-autocomplete. Run `/reload-skills` after editing.
+beside the plugin's `/sutra-harness:build-orchestrator`. Keep
+`export const meta` the first statement and a plain object literal (no
+variables, function calls, spreads, or string concatenation), or Claude Code
+drops the command from `/` autocomplete. Run `/reload-skills` after editing.
 
 ## Methodology behind it
 

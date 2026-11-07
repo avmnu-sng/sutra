@@ -190,14 +190,14 @@ Before fanning out, confirm:
 
 ## Executable primitive
 
-The `/sutra:build-orchestrator` workflow is the sequential reference, not a
-parallel fan-out. It keeps a single writer by running one slice at a time: it
-takes every slice in `execution_plan/sessions/INDEX.md` that is not DONE, in
-INDEX order, and runs each through build, review, fix, validation, and commit
-in one working tree on the checked-out build branch. It commits each slice
-that validates before it starts the next, and stops at the first slice that
-does not. `${CLAUDE_PLUGIN_ROOT}/workflows/README.md` documents its stages and
-stop rules.
+The `/sutra-harness:build-orchestrator` workflow is the sequential reference,
+not a parallel fan-out. It keeps a single writer by running one slice at a
+time: it takes every slice in `execution_plan/sessions/INDEX.md` that is not
+DONE, in INDEX order, and runs each through build, review, fix, validation,
+and commit in one working tree on the checked-out build branch. It commits
+each slice that validates before it starts the next, and stops at the first
+slice that does not. The `workflows/README.md` of the `sutra-harness` plugin
+documents its stages and stop rules.
 
 The serial order is what keeps each commit to one slice. Every stage reads the
 slice's changes as the uncommitted changes in that tree, and the commit stage
@@ -212,7 +212,7 @@ To run slices in parallel, apply this skill outside the workflow:
    needs another track's output waits behind a sequential gate (control 4).
 2. Give each track its own worktree and branch (controls 1 and 5).
 3. Run each track in its own session, started in its worktree. A track can be
-   driven by `/sutra:build-orchestrator` when the INDEX on its branch lists
-   only that track's slices, so no two runs build the same slice.
+   driven by `/sutra-harness:build-orchestrator` when the INDEX on its branch
+   lists only that track's slices, so no two runs build the same slice.
 4. Merge the branches back yourself as the integrator (control 1), and
    reconcile the INDEX and any other seam there.

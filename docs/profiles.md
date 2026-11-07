@@ -1,8 +1,8 @@
 # Profiles
 
-Sutra's operating contract is built from three layer files in
-`plugins/sutra/profiles/`. A profile names the layers that compose its
-contract:
+Sutra's operating contract comes from the `sutra-harness` plugin, which
+builds it from three layer files in `plugins/sutra-harness/profiles/`. A
+profile names the layers that compose its contract:
 
 | Profile | Contract layers | Rule cards | Verify-before-stop |
 | --- | --- | --- | --- |
@@ -11,9 +11,10 @@ contract:
 | `strict` | `core.md` + `standard.md` + `strict.md` | yes | yes |
 | `off` | none | no | no |
 
-`compose` in `plugins/sutra/hooks/sutra.sh` concatenates the layers in that
-order, so moving up a profile never drops a rule; it only adds a layer. The
-security floor runs under every profile, `off` included.
+`compose` in `plugins/sutra-harness/hooks/sutra.sh` concatenates the layers in
+that order, so moving up a profile never drops a rule; it only adds a layer.
+The security floor runs under every profile, `off` included. With only the
+`sutra` skills plugin installed, none of this runs.
 
 ## What each layer holds
 
@@ -81,8 +82,8 @@ search.
 
 ## Rule cards
 
-A card is a short rule in `plugins/sutra/cards/<id>.md`, added to Claude's
-context once per session when its trigger fires and re-armed after a
+A card is a short rule in `plugins/sutra-harness/cards/<id>.md`, added to
+Claude's context once per session when its trigger fires and re-armed after a
 compaction or `/clear`. Cards fire under `standard` and `strict`; under `lite`
 and `off` only the untrusted-content card fires, as part of the security
 floor. Under `strict`, `<id>.strict.md` appends strict-only lines to its card.
@@ -121,11 +122,12 @@ Precedence, first match wins:
 
 1. **`SUTRA_PROFILE`** in your environment -- `lite`, `standard`, `strict`, or
    `off`.
-2. **The plugin's `profile` setting** -- a `userConfig` option in
-   `plugin.json` that Claude Code passes to the hooks as
-   `CLAUDE_PLUGIN_OPTION_PROFILE`. `claude plugin configure sutra` shows it,
-   and `claude plugin configure sutra --values-stdin` sets it from a JSON
-   object such as `{"profile":"strict"}` on standard input. Empty means unset.
+2. **The harness's `profile` setting** -- a `userConfig` option in
+   `sutra-harness`'s `plugin.json` that Claude Code passes to its hooks as
+   `CLAUDE_PLUGIN_OPTION_PROFILE`. `claude plugin configure sutra-harness@sutra`
+   shows it, and `claude plugin configure sutra-harness@sutra --values-stdin`
+   sets it from a JSON object such as `{"profile":"strict"}` on standard
+   input. Empty means unset.
 3. **Default** -- `standard`.
 
 An unrecognized value is skipped. With no choice of yours, a repository's
@@ -229,7 +231,8 @@ check or a CI gate).
 
 ## Editing layers and cards
 
-Work in a clone and load it with `claude --plugin-dir ./plugins/sutra`.
+Work in a clone and load both plugins with `claude --plugin-dir ./plugins`;
+the layers, the cards, and `sutra.sh` are in `plugins/sutra-harness`.
 
 - **A rule that is always true** goes in one layer: `core.md` if every
   profile except `off` should carry it, `standard.md` for `standard` and

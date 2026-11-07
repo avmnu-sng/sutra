@@ -31,10 +31,10 @@ changes -- a stale row either reruns finished work or strands unfinished work.
 ## Build branch
 
 Every slice is built and committed on one build branch: `<build-branch-name>`,
-created from `<base-branch>`. `/sutra:build-orchestrator` never creates or
-switches a branch. It commits each slice that validates to the checked-out
-branch, one commit per slice, and that commit also sets the slice's row above
-to `DONE`.
+created from `<base-branch>`. `/sutra-harness:build-orchestrator` never
+creates or switches a branch. It commits each slice that validates to the
+checked-out branch, one commit per slice, and that commit also sets the
+slice's row above to `DONE`.
 
 ## Column notes
 

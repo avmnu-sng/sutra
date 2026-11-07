@@ -13,7 +13,7 @@ export const meta = {
 };
 
 // Prerequisites, refusals, and resume are documented in README.md beside this
-// file in the sutra plugin.
+// file in the sutra-harness plugin.
 //
 // Slices run strictly one after another in one working tree, and a slice is
 // committed only after it validates: a commit must never carry another

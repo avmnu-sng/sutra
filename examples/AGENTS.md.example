@@ -7,10 +7,11 @@
 <!-- NOTE ------------------------------------------------------------------
 sutra ships the *operating profile* -- the general working style, review
 posture, and safety defaults an agent applies everywhere -- through its
-plugin. Install the plugin (or, if you vendor a copy, add local imports of
-its layers in order, such as `@vendor/sutra/plugins/sutra/profiles/core.md`
-then `@vendor/sutra/plugins/sutra/profiles/standard.md`) so this file does
-NOT have to restate generic agent behavior.
+`sutra-harness` plugin. Install it (or, if you vendor a copy, add local
+imports of its layers in order, such as
+`@vendor/sutra/plugins/sutra-harness/profiles/core.md` then
+`@vendor/sutra/plugins/sutra-harness/profiles/standard.md`) so this file
+does NOT have to restate generic agent behavior.
 
 Keep THIS file focused on what is specific to THIS repository: the exact
 commands, the invariants a newcomer would not guess, and where to look

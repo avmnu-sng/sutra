@@ -2,8 +2,8 @@
 
 Copy-and-adapt templates for wiring `sutra` into a real project.
 
-**Everything in this directory is optional.** The sutra plugin works on its
-own once installed -- none of these files are required to use it. They exist
+**Everything in this directory is optional.** The sutra plugins work on their
+own once installed -- none of these files are required to use them. They exist
 to solve the next set of problems: making the profile travel with a repo,
 layering project-specific rules on top of it, and locking down what an agent
 may run. Treat each file as a starting point: copy it out, delete what you do
@@ -13,7 +13,7 @@ not need, and replace every placeholder with real values for your project.
 
 | File | Purpose | You need it when... |
 | --- | --- | --- |
-| `CLAUDE.md.example` | In-repo import of the sutra profile | Teammates or CI check out the repo without the plugin installed |
+| `CLAUDE.md.example` | In-repo import of the sutra profile | Teammates or CI check out the repo without `sutra-harness` installed |
 | `AGENTS.md.example` | Project-specific guardrails that compose with the profile | You want repo-local commands and invariants an agent cannot guess |
 | `settings.json` | Exact-command allowlist, secret-file denies, and the sandbox turned on | You want Claude Code to ask before anything unexpected and stay out of secrets |
 | `setup.yaml` | Machine-readable bootstrap manifest: setup steps, commands, ports, doc pointers | An agent should learn how to build, test, and navigate the repo without guessing |
@@ -22,14 +22,15 @@ not need, and replace every placeholder with real values for your project.
 ## `CLAUDE.md.example`
 
 An optional way to adopt the sutra profile *in the repository itself*, so that
-teammates who have **not** installed the plugin still pick up its guidance when
-they open the project in Claude Code.
+teammates who have **not** installed the `sutra-harness` plugin still pick up
+its guidance when they open the project in Claude Code.
 
-You usually do not need this. If a teammate has the sutra plugin installed, the
+You usually do not need this. If a teammate has `sutra-harness` installed, the
 profile is already active for them globally -- no `CLAUDE.md` change required.
-Reach for the in-repo approach only when you want the profile to travel *with*
-the repository: for contributors on a clean checkout, or for CI and agent runs
-that start from bare source.
+The `sutra` plugin alone carries skills and subagents, not the profile. Reach
+for the in-repo approach when you want the profile to travel *with* the
+repository: for teammates without the harness, contributors on a clean
+checkout, or CI and agent runs that start from bare source.
 
 The template documents two mutually exclusive ways to wire it up:
 
@@ -39,14 +40,14 @@ The template documents two mutually exclusive ways to wire it up:
   (`lite`), then `standard.md` (`standard`), then `strict.md` (`strict`).
   `@import` resolves **local paths only** -- it cannot fetch a URL or a remote
   git ref, so the vendored copy must be checked in and present on disk. This
-  works for everyone, plugin or not.
-- **Option B -- a `.sutra` marker.** If everyone on the team already has the
-  plugin and you want `strict`, drop a one-line `.sutra` containing `strict`
-  at the repo root. It raises the profile to `strict` for teammates who have
-  not chosen one themselves (`SUTRA_PROFILE` or the plugin's `profile`
-  setting); a `.sutra` naming `lite` or `off` is refused, and `standard` is
-  already the default. Lightest touch, but it does nothing for a checkout
-  without the plugin.
+  works for everyone, harness or not.
+- **Option B -- a `.sutra` marker.** If everyone on the team already has
+  `sutra-harness` and you want `strict`, drop a one-line `.sutra` containing
+  `strict` at the repo root. It raises the profile to `strict` for teammates
+  who have not chosen one themselves (`SUTRA_PROFILE` or the harness's
+  `profile` setting); a `.sutra` naming `lite` or `off` is refused, and
+  `standard` is already the default. Lightest touch, but it does nothing for
+  a checkout without the harness.
 
 Pick one, not both, so there is a single source of truth for which profile
 applies. Below the wiring, the template leaves a **Project specifics** section
@@ -56,8 +57,8 @@ for the build/test/lint commands, conventions, and layout an agent needs.
 
 Project-specific guardrails that **compose with** sutra rather than restating
 it. The profile -- general working style, review posture, and safety defaults
--- comes from the plugin (or a local `@import` if you vendor a copy). This file
-stays focused on what is unique to one repository:
+-- comes from `sutra-harness` (or a local `@import` if you vendor a copy).
+This file stays focused on what is unique to one repository:
 
 - The exact task-runner entrypoints (`check`, `test`, `lint`, `build`) and why
   to prefer the runner over raw commands.
@@ -161,9 +162,10 @@ wired, which makes them stronger than the advisory guidance a profile provides:
 - `empty-test-detector.sh` warns when Claude writes a test with no assertion.
   It is a `PostToolUse` hook, which runs after the write and cannot undo it.
 
-Nothing here is wired in until you add it to your own settings, so the plugin
-never imposes a hook you did not ask for. See [`hooks/README.md`](hooks/README.md)
-for what each hook event can block and how to wire each script.
+Nothing here is wired in until you add it to your own settings, so neither
+Sutra plugin imposes one of these hooks on you. See
+[`hooks/README.md`](hooks/README.md) for what each hook event can block and
+how to wire each script.
 
 ---
 
