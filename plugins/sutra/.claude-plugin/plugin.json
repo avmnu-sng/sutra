@@ -1,7 +1,7 @@
 {
   "name": "sutra",
   "description": "A senior-engineer operating system for Claude Code -- architecture review, verification discipline, multi-session build orchestration, doc sanitization, and commit craft, delivered as skills, subagents, and layered lite/standard/strict profiles.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "avmnu-sng"
   },
