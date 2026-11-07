@@ -21,7 +21,7 @@ payload="$(cat 2>/dev/null || true)"
 file="$(printf '%s' "$payload" | sed -n 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)"
 [ -n "$file" ] && [ -f "$file" ] || exit 0
 
-line="$(LC_ALL=C perl -ne 'if (/[^\x00-\x7F]/) { print "$."; last }' "$file" 2>/dev/null || true)"
+line="$(LC_ALL=C perl -e 'open(my $fh, "<", $ARGV[0]) or exit 0; while (<$fh>) { if (/[^\x00-\x7F]/) { print $.; last } }' -- "$file" 2>/dev/null || true)"
 [ -n "$line" ] || exit 0
 
 printf '{"systemMessage":"sutra(strict): non-ASCII byte in %s (first at line %s). Prefer ASCII: -- for an em dash, -> for an arrow, plain quotes. Set SUTRA_PROFILE=standard to silence."}\n' "$file" "$line"

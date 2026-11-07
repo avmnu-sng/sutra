@@ -32,14 +32,18 @@ and honest are welcome.
 ## Validate before opening a PR
 
 ```
-claude plugin validate .
-claude plugin validate ./plugins/sutra
+claude plugin validate --strict .
+claude plugin validate --strict --profile directory ./plugins/sutra
 find . -type f ! -path './.git/*' -exec file {} \; | grep -v 'ASCII text' || echo "all ASCII"
 ```
 
+`--strict` fails on warnings, and `--profile directory` adds the subset of the
+plugin directory's checks the CLI can run (README, license, icon). The
+directory's portal runs more checks, plus a security scan, after you push.
+
 CI (`.github/workflows/ci.yml`) runs the ASCII, JSON/YAML, shell-syntax, and
 frontmatter checks on every push and pull request. Run `claude plugin validate`
-locally (a schema check) before opening a PR.
+locally before opening a PR.
 
 ## Commits and branches
 

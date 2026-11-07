@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/inject-profile.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/inject-profile.sh\""
           }
         ]
       }
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/ascii-guard.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/ascii-guard.sh\""
           }
         ]
       }

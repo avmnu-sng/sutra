@@ -236,15 +236,17 @@ exit 2   # hard stop; stderr becomes the agent's feedback
 
 ### E. Repo-freshness / staleness (SessionStart, always exits 0)
 
-Fetch, compute ahead/behind versus upstream, inject the result as context. A
-`SessionStart` hook must never gate a session -- offline, detached HEAD, no
-upstream all fall through to `exit 0`.
+Compute ahead/behind versus the upstream ref as of the last fetch, and inject
+the result as context. Do not fetch from a hook: a network call on every
+session start runs with the user's git credentials, adds latency, and fails
+offline. Report the cached state and leave fetching to an explicit step. A
+`SessionStart` hook must never gate a session -- detached HEAD and no upstream
+both fall through to `exit 0`.
 
 ```bash
 #!/usr/bin/env bash
 set -u
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
-git fetch --quiet 2>/dev/null || exit 0            # offline? never block.
 
 upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"
 [ -n "$upstream" ] || exit 0
@@ -252,8 +254,9 @@ set -- $(git rev-list --left-right --count "$upstream"...HEAD 2>/dev/null)
 behind="${1:-0}"; ahead="${2:-0}"
 [ "$behind" = "0" ] && exit 0
 
-printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Branch is %s behind / %s ahead of %s. Consider rebasing before you start."}}\n' \
-  "$behind" "$ahead" "$upstream"
+up="$(printf '%s' "$upstream" | sed 's/\\/\\\\/g; s/"/\\"/g')"   # refs may hold a quote
+printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"As of the last fetch, this branch is %s behind / %s ahead of %s. Fetch and rebase before you start."}}\n' \
+  "$behind" "$ahead" "$up"
 exit 0
 ```
 

@@ -132,9 +132,10 @@ If you are contributing to Sutra, validate the plugin manifest before
 opening a pull request:
 
 ```
-claude plugin validate .
-claude plugin validate ./plugins/sutra
+claude plugin validate --strict .
+claude plugin validate --strict --profile directory ./plugins/sutra
 ```
 
 The first validates the marketplace at the repo root; the second validates
-the plugin package itself.
+the plugin package itself, including the plugin directory checks the CLI can
+run. `--strict` turns warnings into failures.

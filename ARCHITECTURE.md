@@ -82,8 +82,9 @@ and reach for the skill's full procedure when the work calls for it.
   `plugins/sutra/agents/`.
 - Add a rule to a profile: edit the profile file; keep the layering (a rule in
   `standard` must also hold in `strict`).
-- Validate before publishing: `claude plugin validate .` at the repo root, and
-  `claude plugin validate ./plugins/sutra` for the plugin itself.
+- Validate before publishing: `claude plugin validate --strict .` at the repo
+  root, and `claude plugin validate --strict --profile directory ./plugins/sutra`
+  for the plugin itself.
 
 ## Compatibility notes
 

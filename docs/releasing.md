@@ -51,12 +51,14 @@ before the version bump so you never tag a broken tree.
 2. **Validate locally and confirm CI is green.** Run both:
 
    ```
-   claude plugin validate .
-   claude plugin validate ./plugins/sutra
+   claude plugin validate --strict .
+   claude plugin validate --strict --profile directory ./plugins/sutra
    ```
 
-   `claude plugin validate` is a local schema check -- run it before the
-   version bump so you never tag a manifest that fails validation. Then confirm
+   Both must report nothing: `--strict` fails on warnings, and
+   `--profile directory` runs the subset of the plugin directory's checks the
+   CLI can see. Run them before the version bump so you never tag a manifest
+   that fails validation. Then confirm
    `.github/workflows/ci.yml` is green on the exact
    SHA you are about to tag (ASCII-only, JSON/YAML validity, shell syntax,
    skill/agent frontmatter). Green on "a recent run" is not green on this SHA.
@@ -99,6 +101,25 @@ before the version bump so you never tag a broken tree.
    Then confirm an already-installed client picks it up via
    `/plugin marketplace update sutra`. The reported version must be `X.Y.Z`.
    If it still shows the old version, step 3 was skipped or not pushed.
+
+9. **Re-check the directory listing.** On the plugin's page in the developer
+   portal (claude.ai/directory/manage), select **Check for new commits** so
+   the directory scans the tagged commit now rather than at its next scheduled
+   check. The portal runs checks and a security scan the CLI cannot; read the
+   Versions tab and fix anything marked Blocks.
+
+## The listing icon
+
+`plugins/sutra/assets/icon.png` is rendered from the vector source
+`docs/assets/sutra-icon.svg` (the directory accepts a square PNG or JPEG of
+512 to 2048 px, not SVG):
+
+```
+rsvg-convert -w 512 -h 512 docs/assets/sutra-icon.svg -o plugins/sutra/assets/icon.png
+```
+
+The portal takes the icon from the first saved or submitted version only, so a
+later change to the file has to be set in the developer portal as well.
 
 ## Do NOT
 
