@@ -71,7 +71,7 @@ kinds of file from it.
 - **Instruction files** (`scan_instructions`). At session start Sutra scans
   `CLAUDE.md`, `CLAUDE.local.md`, `.claude/CLAUDE.md`, `AGENTS.md`,
   `GEMINI.md`, `.cursorrules`, `.github/copilot-instructions.md`, the `*.md`
-  files directly inside `.claude/rules/`, and up to 50 `CLAUDE.md` files one
+  files directly inside `.claude/rules/`, and up to 20 `CLAUDE.md` files one
   or two directories below the project root, outside `.git`, `.claude`, and
   `node_modules`. A hit tells Claude to treat that file's instructions as
   untrusted, and tells you the file, line, and code point.
@@ -82,10 +82,15 @@ kinds of file from it.
 The scan looks for bidirectional controls (U+061C, U+200E, U+200F,
 U+202A-U+202E, U+2066-U+2069), zero-width and invisible characters (U+180E,
 U+200B-U+200D, U+2060-U+2064, and U+FEFF anywhere but the start of a file),
-and Unicode tag characters (U+E0000-U+E007F). It decodes each line as UTF-8,
-skips a file over 4 MiB or with a NUL byte in its first 8 KiB, and reports
-only the first hit in each file. A warning quotes the file's path, which the
-repository chose, but never the file's content.
+and Unicode tag characters (U+E0000-U+E007F). It matches the raw UTF-8 bytes
+of each listed character rather than decoding the file, so invalid bytes
+nearby cannot hide one. It skips a file over 4 MiB, and a file Claude reads or
+writes whose first 8 KiB holds a NUL byte; an instruction file is scanned
+even then, since Claude Code loads it whatever it holds, and the NUL is
+itself reported. It reports only the first hit in each file. A warning names
+the file's path, which the repository chose, but never the file's content.
+The path is quoted, every character outside `[A-Za-z0-9._/@+-]` becomes `?`,
+and a long path is shortened, so a crafted name cannot add instructions.
 
 ### Sutra's own files
 
@@ -148,14 +153,15 @@ your account can write to it.
   edits to run the project's checks.
 - **Detection covers a fixed set of hidden characters.** Anything outside it,
   such as variation selectors (U+FE00-U+FE0F, U+E0100-U+E01EF), passes
-  unreported, as does a file in another encoding: a UTF-16 file has NUL bytes
-  and is skipped as binary. Injected instructions written in plain, visible
-  text are not detected at all.
+  unreported, as does a file in another encoding: a UTF-16 file Claude reads
+  or writes has NUL bytes and is skipped as binary (in an instruction file,
+  the NUL itself is reported). Injected instructions written in plain,
+  visible text are not detected at all.
 - **Some content is not scanned when it reaches Claude:** Bash and Grep
   output, web pages, MCP tool results and descriptions, a repository's own
   skills, agents, and commands under `.claude/`, files an instruction file
   imports with `@path`, `CLAUDE.md` files deeper than two directories or past
-  the first 50, and rules files in subdirectories of `.claude/rules/`. Of
+  the first 20, and rules files in subdirectories of `.claude/rules/`. Of
   these, a file is scanned only if Claude opens it with Read. Save a copy and
   run the scan in section 3 of the agent-security skill.
 - **It fails open.** When perl or its core JSON::PP and Encode modules are

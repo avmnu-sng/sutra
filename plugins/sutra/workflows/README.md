@@ -58,8 +58,12 @@ edits would land in the wrong commit.
 
 - **Start on the wrong tree.** It refuses to start on `main`, `master`, the
   remote's default branch (`origin/HEAD`), or a detached HEAD, or with
-  uncommitted changes in the working tree. When `origin/HEAD` is not set, only
-  `main` and `master` count as the default branch, and the run logs that.
+  uncommitted changes in the working tree. Branch names are compared after
+  Unicode normalization and case folding, so `Main` and `MASTER` are refused
+  too: on a case-insensitive file system (the macOS and Windows default), git
+  treats `Main` as the `main` branch, and a commit there moves `main`. When
+  `origin/HEAD` is not set, only `main` and `master` count as the default
+  branch, and the run logs that.
 - **Start on a malformed plan.** It refuses to start, and no slice runs, when
   the INDEX lists no slice rows or any row fails these checks: an id of 1 to
   64 characters from `A-Z a-z 0-9 . _ -` that starts with a letter or digit

@@ -72,7 +72,7 @@ user as `systemMessage`.
 | `UserPromptSubmit` | route | Under `standard` and `strict`, adds the commit, publish, or migration card when the prompt mentions one. |
 | `PostToolUse` (Write, Edit, MultiEdit, NotebookEdit, Read, Bash, WebFetch, WebSearch, Agent, Task) | check | Under every profile (the security floor), scans each file Claude writes or reads for hidden Unicode and adds the untrusted-content card after a web fetch or search. Under `standard` and `strict`, adds the test, migration, doc, or code card on the first such edit, the commit or publish card when a commit, push, release, or upload runs, and the delegate card after a subagent returns. Under `strict`, notes a non-ASCII byte in a written file and counts edits and check commands for the stop gate. |
 | `PreCompact` | brief | Except under `off`, prints what the compaction summary must keep: the task, decisions with reasons, files changed, checks run, open and deferred items, and security warnings. |
-| `Stop` | gate | Under `strict` only, blocks the stop once (`decision: block` with a reason) when code changed and no check command ran since. |
+| `Stop` | gate | Under `strict` only, blocks the stop once (`decision: block` with a reason) when a file that is not a doc changed and no check command ran since. |
 
 The gate never fires while `stop_hook_active` is true, never twice for the same
 edits, and not when Claude's last message ends with a question;
@@ -99,17 +99,24 @@ differently. `scan_file` checks every file Claude writes or reads, and at
 session start `scan_instructions` checks the instruction files coding agents
 load: `CLAUDE.md`, `CLAUDE.local.md`, `.claude/CLAUDE.md`, `AGENTS.md`,
 `GEMINI.md`, `.cursorrules`, `.github/copilot-instructions.md`,
-`.claude/rules/*.md`, and `CLAUDE.md` files in subdirectories up to two levels
-below the project root (at most 50), which Claude Code loads on demand without
-a Read that Sutra could see. Files
-over 4 MiB and binary files are skipped. The set is fixed: variation selectors
-(U+FE00-U+FE0F, U+E0100-U+E01EF) and other default-ignorable characters
-outside it are not flagged. A line with invalid UTF-8 is decoded leniently, so
-a stray bad byte cannot hide a character after it. A scan reports only the
-first hidden character in a file; each finding goes to Claude as context and
-to the user as a notice. The floor also includes the untrusted-content card
-after WebFetch and WebSearch. Only the user's `SUTRA_SECURITY=off` turns it
-off; a repository's `.sutra` cannot.
+`.claude/rules/*.md`, and up to 20 `CLAUDE.md` files in subdirectories up to
+two levels below the project root, which Claude Code loads on demand without
+a Read that Sutra could see. Files over 4 MiB are skipped. A file Claude
+writes or reads is also skipped as binary when its first 8 KiB holds a NUL
+byte, but an instruction file is scanned even then, since Claude Code loads
+it whatever it holds, and the NUL is itself reported. The set is fixed:
+variation selectors (U+FE00-U+FE0F, U+E0100-U+E01EF) and other
+default-ignorable characters outside it are not flagged. The scan matches the
+raw UTF-8 bytes of each listed character instead of decoding the file, so
+invalid bytes nearby cannot hide one. A scan reports only the first hidden
+character in a file; each finding goes to Claude as context and to the user
+as a notice. The file path in a finding is quoted, with every character
+outside `[A-Za-z0-9._/@+-]` replaced by `?` and a long path shortened, so a
+crafted file name cannot add instructions. The floor also includes the
+untrusted-content card after WebFetch and WebSearch. `SUTRA_SECURITY=off`
+turns it off. A repository's `.sutra` cannot, but its `.claude/settings.json`
+can set that variable through its `env` key once the folder is trusted, or in
+any `claude -p` run (see Residual risk in `docs/security.md`).
 
 ## Layout
 
@@ -153,15 +160,15 @@ Guidance appears at layered depths, by design:
 - **Card** (`cards/<id>.md`) -- a few lines of rule delivered at the moment
   they apply (a commit, a test or migration edit, a subagent result, web
   content), naming the skill that holds the depth. The eight cards and their
-  two strict add-ons total 2,726 bytes; each card is paid at most once between
+  two strict add-ons total 2,797 bytes; each card is paid at most once between
   compactions (cards re-arm after a compaction or `/clear`), and only when its
   trigger fires. `cards/compact.md` (306 bytes) is not a card: PreCompact
   prints it as the compaction brief.
 - **Skill** (`skills/<name>/SKILL.md`) -- the actionable checklist for one
   methodology, pulled in on demand when you invoke it or when the task matches
-  its description. The skill and agent listings cost about 1,620 tokens;
-  `claude --plugin-dir ./plugins/sutra plugin details sutra` prints the cost of
-  every component.
+  its description. The skill and agent listings cost about 1,620 tokens, the
+  figure `claude --plugin-dir ./plugins/sutra plugin details sutra` prints; it
+  counts the hooks as free, so it leaves out the contract and the cards above.
 - **Docs** (`docs/`) -- long-form references that stand alone outside Claude
   Code: the architect persona and the profile guide.
 

@@ -156,12 +156,16 @@ $extra"
   add_ctx "$text"
 }
 
+# label PATH prints a project-relative, quoted, sanitized path: a crafted file
+# name must not be able to add text Claude could read as an instruction.
 label() {
   local p="$1" d="${CLAUDE_PROJECT_DIR:-}"
   if [ -n "$d" ]; then
     case "$p" in "$d"/*) p="${p#"$d"/}" ;; esac
   fi
-  printf '%s' "$p"
+  p="$(printf '%s' "$p" | tr -c 'A-Za-z0-9._/@+-' '?')"
+  if [ "${#p}" -gt 120 ]; then p="...$(printf '%s' "$p" | tail -c 117)"; fi
+  printf "'%s'" "$p"
 }
 
 # scan_file PATH WANT_ASCII prints "hidden LINE U+XXXX" for the first
@@ -169,36 +173,40 @@ label() {
 # non-ASCII byte when WANT_ASCII is 1. Binary files and files over 4 MiB are
 # skipped. The path is opened with a three-argument open, never interpreted.
 scan_file() {
-  perl -MEncode -e '
-    my ($f, $want_ascii) = @ARGV;
+  perl -e '
+    my ($f, $want_ascii, $mode) = @ARGV;
     exit 0 unless -f $f;
     my $size = -s _;
     exit 0 if !defined $size || $size > 4194304;
     open(my $fh, "<:raw", $f) or exit 0;
-    my $head = "";
-    read($fh, $head, 8192);
-    exit 0 if index($head, "\0") >= 0;
-    seek($fh, 0, 0) or exit 0;
-    my ($n, $hidden, $ascii) = (0, "", "");
-    while (my $l = <$fh>) {
-      $n++;
-      next unless $l =~ /[\x80-\xff]/;
-      $ascii ||= $n;
-      # Lenient decode: a stray invalid byte must not hide the rest of the line.
-      my $c = Encode::decode("UTF-8", $l, Encode::FB_DEFAULT);
-      $c =~ s/\A\x{FEFF}// if $n == 1;
-      if (!$hidden && $c =~ /([\x{061C}\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}-\x{2064}\x{2066}-\x{2069}\x{FEFF}\x{180E}\x{E0000}-\x{E007F}])/) {
-        $hidden = sprintf "%d U+%04X", $n, ord $1;
-      }
-      last if $hidden && (!$want_ascii || $ascii);
+    my $data = do { local $/; <$fh> };
+    close $fh;
+    $data = "" unless defined $data;
+    # Instruction files are always text to Claude Code, so a NUL there is a
+    # finding, not a reason to skip the file.
+    my $instr = $mode eq "instructions";
+    exit 0 if !$instr && index(substr($data, 0, 8192), "\0") >= 0;
+    # Match the UTF-8 bytes themselves: no decoding, so invalid bytes nearby
+    # cannot hide a character, and large files stay fast.
+    my $chars = qr/\xD8\x9C|\xE1\xA0\x8E|\xE2\x80[\x8B-\x8F\xAA-\xAE]|\xE2\x81[\xA0-\xA4\xA6-\xA9]|\xEF\xBB\xBF|\xF3\xA0[\x80\x81][\x80-\xBF]/;
+    my $re = $instr ? qr/(\x00|$chars)/ : qr/($chars)/;
+    my $line_at = sub { my $pre = substr($data, 0, $_[0]); 1 + ($pre =~ tr/\n//) };
+    pos($data) = ($data =~ /\A\xEF\xBB\xBF/) ? 3 : 0;
+    if ($data =~ /$re/g) {
+      my ($m, $at) = ($1, $-[1]);
+      my $c = $m;
+      my $cp = $m eq "\0" ? 0 : (utf8::decode($c) ? ord $c : 0);
+      printf "hidden %d U+%04X\n", $line_at->($at), $cp;
     }
-    print "hidden $hidden\n" if $hidden;
-    print "ascii $ascii\n" if $want_ascii && $ascii;
-  ' -- "$1" "$2" 2>/dev/null
+    if ($want_ascii && $data =~ /[\x80-\xff]/) {
+      printf "ascii %d\n", $line_at->($-[0]);
+    }
+  ' -- "$1" "$2" "${3:-}" 2>/dev/null
 }
 
 describe() {
   case "$1" in
+    U+0000) echo "a NUL byte" ;;
     U+200B|U+200C|U+200D|U+2060|U+FEFF) echo "a zero-width character" ;;
     U+061C|U+200E|U+200F|U+202[A-E]|U+206[6-9]) echo "a bidirectional control character" ;;
     U+E00[0-7]?) echo "a Unicode tag character" ;;
@@ -225,7 +233,7 @@ warn_hidden() {
 
 check_hidden() {
   local r line cp
-  r="$(scan_file "$1" 0)"
+  r="$(scan_file "$1" 0 "$3")"
   case "$r" in "hidden "*) ;; *) return 0 ;; esac
   r="${r#hidden }"
   line="${r%% *}"
@@ -252,20 +260,62 @@ classify() {
   echo other
 }
 
+# is_check CMD succeeds when one simple command in CMD runs a check: a known
+# test, lint, build or type-check tool, a task runner with a check-like target,
+# or a script whose path names a test or check. Matching the command word (not
+# a substring) keeps "git commit -m 'add go test'" from counting.
 is_check() {
-  case "$1" in
-    *" make "*|*" gmake "*|*" just "*|*" task "*|*" npm "*|*" pnpm "*|*" yarn "*|*" bun "*|*" mise "*|*gradlew*|*" gradle "*|*" mvn "*|*" rake "*|*" tox "*|*" nox "*)
-      case "$1" in *test*|*check*|*lint*|*verify*|*" ci "*|*build*|*validate*) return 0 ;; esac ;;
-  esac
-  case "$1" in
-    *" go test"*|*" go vet"*|*" go build"*|*" cargo test"*|*" cargo check"*|*" cargo clippy"*|*" cargo build"*|*" cargo nextest"*|*pytest*|*" -m unittest"*|*" dotnet test"*|*" dotnet build"*|*" swift test"*|*" swift build"*|*" bash -n"*|*" terraform validate"*|*" terraform plan"*|*" plugin validate"*|*" bazel test"*|*" bazel build"*|*" deno test"*|*" deno check"*)
-      return 0 ;;
-  esac
-  # Single-word tools, also when invoked by path (vendor/bin/phpunit).
-  case "$1" in
-    *[/\ ]mypy[\ .]*|*[/\ ]ruff\ *|*[/\ ]flake8[\ .]*|*[/\ ]pylint\ *|*[/\ ]eslint[\ .]*|*[/\ ]tsc[\ .]*|*[/\ ]vitest[\ .]*|*[/\ ]jest[\ .]*|*[/\ ]mocha[\ .]*|*[/\ ]rspec[\ .]*|*[/\ ]phpunit[\ .]*|*[/\ ]shellcheck\ *|*[/\ ]ctest[\ .]*)
-      return 0 ;;
-  esac
+  local seg w a sub
+  while IFS= read -r seg; do
+    set -f
+    # shellcheck disable=SC2086
+    set -- $seg
+    set +f
+    while [ $# -gt 0 ]; do
+      case "$1" in [A-Za-z_]*=*) shift ;; *) break ;; esac
+    done
+    [ $# -gt 0 ] || continue
+    w="${1##*/}"
+    shift
+    case "$w" in
+      npx|bunx) [ $# -gt 0 ] || continue; w="${1##*/}"; shift ;;
+    esac
+    sub="${1:-}"
+    case "$w" in
+      git|echo|printf|cat|less|more|head|tail|grep|rg|sed|awk|ls|find|cd|export|which|type|man) continue ;;
+      npm|pnpm|yarn|bun)
+        case "$sub" in test|t|tst) return 0 ;; esac
+        case "$sub" in run|run-script) sub="${2:-}" ;; esac
+        case "$sub" in *test*|*check*|*lint*|*verify*|*build*|ci|*validate*) return 0 ;; esac ;;
+      cargo|go|dotnet|swift|deno|bazel|bazelisk)
+        case "$sub" in test|check|clippy|build|vet|nextest|lint) return 0 ;; esac ;;
+      make|gmake|just|task|mise|gradle|gradlew|mvn|mvnw|rake|tox|nox)
+        case "$w" in make|gmake|tox|nox) [ $# -eq 0 ] && return 0 ;; esac
+        for a in "$@"; do
+          case "$a" in -*) continue ;; esac
+          case "$a" in *test*|*check*|*lint*|*verify*|ci|*build*|*validate*) return 0 ;; esac
+        done ;;
+      pytest|py.test|mypy|ruff|flake8|pylint|eslint|tsc|vitest|jest|mocha|rspec|phpunit|shellcheck|ctest|golangci-lint)
+        return 0 ;;
+      python|python3|python3.*)
+        case " $* " in *" -m pytest "*|*" -m unittest "*|*" -m mypy "*|*" -m ruff "*) return 0 ;; esac ;;
+      bash|sh|zsh)
+        [ "$sub" = "-n" ] && return 0
+        for a in "$@"; do
+          case "$a" in -*) continue ;; esac
+          case "$a" in *test*|*check*|*lint*|*verify*) return 0 ;; esac
+          break
+        done ;;
+      terraform)
+        case "$sub" in validate|plan) return 0 ;; esac ;;
+      claude)
+        [ "$sub" = plugin ] && [ "${2:-}" = validate ] && return 0 ;;
+      *test*|*check*|*lint*|*verify*)
+        return 0 ;;
+    esac
+  done <<EOF
+$(printf '%s\n' "$1" | tr ';&|' '\n\n\n')
+EOF
   return 1
 }
 
@@ -297,7 +347,7 @@ scan_instructions() {
   while IFS= read -r f; do
     check_hidden "$f" "$(label "$f")" instructions
   done < <(find "$dir" -mindepth 2 -maxdepth 3 -name CLAUDE.md -type f \
-    -not -path '*/.git/*' -not -path '*/.claude/*' -not -path '*/node_modules/*' 2>/dev/null | head -n 50)
+    -not -path '*/.git/*' -not -path '*/.claude/*' -not -path '*/node_modules/*' 2>/dev/null | head -n 20)
 }
 
 on_session_start() {
@@ -338,7 +388,7 @@ on_prompt() {
   open_state || return 0
   case "$p" in *commit*) card commit ;; esac
   case "$p" in
-    *" push"*|*publish*|*release*|*deploy*|*"open source"*|*open-source*|*" tag "*) card publish ;;
+    *" push"*|*publish*|*release*|*deploy*|*"open source"*|*open-source*|*" tag"[[:space:][:punct:]]*|*" tags"[[:space:][:punct:]]*) card publish ;;
   esac
   case "$p" in
     *migration*|*" migrate"*|*backfill*|*"schema change"*|*"alter table"*) card migration ;;

@@ -60,10 +60,11 @@ tag characters (U+E0000-U+E007F) mirror printable ASCII and render as nothing
 Sutra's security floor checks each file Claude writes, edits, or opens with the
 Read tool, and at session start the instruction files: `CLAUDE.md`, `AGENTS.md`,
 `CLAUDE.local.md`, `.claude/CLAUDE.md`, `GEMINI.md`, `.cursorrules`,
-`.github/copilot-instructions.md`, `.claude/rules/*.md`, and up to 50
+`.github/copilot-instructions.md`, `.claude/rules/*.md`, and up to 20
 `CLAUDE.md` files in subdirectories up to two levels deep. It reports the first
 hidden character per file, with code point and line, to Claude and to you;
-skips binary files and files over 4 MiB; and runs under every profile unless
+skips files over 4 MiB, and binary files other than instruction files (a NUL
+in an instruction file is reported); and runs under every profile unless
 you set `SUTRA_SECURITY=off`. It does not scan Bash or Grep output, web pages,
 or MCP tool text; save a copy and scan that. A hit in an instruction file makes
 the whole file untrusted until the user has seen the decoded text; in a file
@@ -155,6 +156,17 @@ Installing enables it unless its manifest or marketplace entry sets
   hosts the job needs at the container: this mode lets sandboxed commands
   reach any host not denied. Edits to a bind-mounted workspace land on your
   host; review them (section 7) before you run git, npm, or make there.
+- Auto mode (`--permission-mode auto`) has a classifier model approve each
+  action in your place. It blocks what its rules call risky, such as force
+  pushes, production deploys, irreversible deletes, and sensitive data
+  leaving the trusted repository and domains, and lets routine-looking steps
+  run: edits inside the project, read-only requests, installs of the
+  dependencies a manifest declares (their install scripts included), and
+  pushes to the session's own repository. An injection that asks only for
+  routine-looking steps gets through, and the classifier can misjudge either
+  way: it does not replace the sandbox, deny rules, or section 2.
+  `claude auto-mode defaults` prints its rules, and `claude auto-mode config`
+  the ones in effect.
 - Issue and pull request text that reaches a CI agent is untrusted content; a
   job that reads it holds no publishing secrets.
 

@@ -27,16 +27,29 @@ It runs two ways, told apart by its input:
   the backstop.
 - **Claude Code `PreToolUse` hook on `Bash`.** It reads `tool_input.command`
   from the payload and stands aside unless the command runs
-  `git [global options] commit` in this repository: `git commit`,
-  `git -C . commit`, `cd src && git commit`. It checks the index as it
-  stands *before* the command runs, adds tracked changes for
-  `git commit -a`, and counts the whole working tree when the same command
-  also runs `git add`, because what that `git add` will stage cannot be
-  known in advance. Quoted text counts as an argument, never as a command.
-  It sees only commands Claude runs, and not a commit hidden in `bash -c`,
-  a script, a git alias, a command substitution inside double quotes
-  (`"$(git commit)"`), or a wrapper that takes arguments of its own, such as
-  `timeout 60` or `env -i`.
+  `git [global options] commit` in the repository that holds
+  `$CLAUDE_PROJECT_DIR`, which Claude Code sets for every hook: `git commit`,
+  `git -C . commit`, `cd src && git commit`, `eval "git commit"`. It checks
+  the index as it stands *before* the command runs, adds tracked changes
+  for `git commit -a`, and counts the whole working tree when the same
+  command also runs `git add`, because what that `git add` will stage
+  cannot be known in advance. A `git commit` inside quotes or a
+  here-document body is data, never a command, except in the arguments of
+  `eval`, which it reads again as the command they become. It sees only
+  commands Claude runs, and it misses a commit:
+  - inside `bash -c`, a script, a here-document fed to a shell, or a git
+    alias;
+  - in a command substitution inside double quotes (`"$(git commit)"`);
+  - behind a wrapper that takes arguments of its own, such as `timeout 60`,
+    `env -i`, `sudo -u bob`, or `find -exec`;
+  - whose command name or `eval` text comes from a variable, or has a
+    backslash or quote inside the name (`$GIT commit`, `eval "$c"`,
+    `g\it commit`);
+  - under `git --git-dir` or `--work-tree`;
+  - after a `cd` it cannot resolve before the command runs, such as `cd -`
+    or a `cd` into a directory the same command creates;
+  - after a `cd` inside a subshell or pipeline, which it applies to the
+    rest of the command: `(cd /tmp); git commit`.
 
 | Knob | Default | Meaning |
 | --- | --- | --- |
@@ -157,24 +170,37 @@ Add the entries to **your own** `.claude/settings.json` (this project) or
 - To set a knob, prefix it:
   `"MODE=block \"$CLAUDE_PROJECT_DIR\"/examples/hooks/source-change-requires-test.sh"`.
 
+To try the `PreToolUse` form by hand, pipe it a payload and set
+`CLAUDE_PROJECT_DIR` yourself; without it, the hook stays silent:
+
+```sh
+jq -cn --arg cwd "$PWD" \
+  '{hook_event_name: "PreToolUse", tool_input: {command: "git commit -m x"}, cwd: $cwd}' |
+  CLAUDE_PROJECT_DIR="$PWD" MODE=block examples/hooks/source-change-requires-test.sh
+```
+
 ## Contracts every template honors
 
 ### Fail open
 
 If the tooling a hook needs is missing (no `git`, neither `jq` nor perl's
-`JSON::PP`, an unreadable path, an invalid regex), the hook **exits 0** and
-stays silent. A safety net that breaks the build when it cannot run is worse
-than no net. Never let a hook failure become the user's failure.
+`JSON::PP`, an unreadable path, an invalid regex, no `CLAUDE_PROJECT_DIR`
+for a `PreToolUse` payload), the hook **exits 0** and stays silent. A
+safety net that breaks the build when it cannot run is worse than no net.
+Never let a hook failure become the user's failure.
 
 ### Input is data
 
 The payload is parsed with `jq`, or with perl's core `JSON::PP` when `jq` is
 missing, and every JSON answer is built the same way, never by pasting
 strings into JSON. The command a `PreToolUse` hook inspects is text to read,
-never to run: `source-change-requires-test.sh` follows `cd` and `git -C` only
-to decide whether the commit is in this repository, and runs git only here,
-because another repository's configuration could run a program before you
-approve the command.
+never to run: `source-change-requires-test.sh` follows `cd`, `git -C`, and
+`eval` only to decide whether the commit is in the project's repository. As
+a `PreToolUse` hook it runs git only in the repository that holds
+`$CLAUDE_PROJECT_DIR`, never in the payload's `cwd` or in a repository
+nested inside the project, and always with `core.fsmonitor` off. A
+repository's configuration can name a program for git to start, and from a
+`PreToolUse` hook that program would run before you approve the command.
 
 ### Warn before block
 

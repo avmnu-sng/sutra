@@ -1,5 +1,5 @@
 {
-  "description": "Sutra harness: the operating contract at session start, short rule cards when they apply, hidden-Unicode warnings, a compaction brief, and under strict one verify-before-stop nudge. Reads the hook payload, SUTRA_* variables and the project's .sutra file; writes only stdout and its plugin data directory; no network calls; never blocks a tool call.",
+  "description": "Sutra harness: the operating contract at session start, short rule cards when they apply, hidden-Unicode warnings, a compaction brief, and under strict one verify-before-stop nudge. Reads the hook payload, SUTRA_* variables, the plugin's profile setting (CLAUDE_PLUGIN_OPTION_PROFILE), the project's .sutra file, and, to scan them in place for hidden characters, the agent instruction files at session start and each file Claude writes or reads; writes only stdout and its plugin data directory; no network calls; never blocks a tool call.",
   "hooks": {
     "SessionStart": [
       {

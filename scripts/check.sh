@@ -2,8 +2,8 @@
 # The repository checks CI runs, for contributors to run before a PR:
 #   bash scripts/check.sh
 # Checks tracked files plus untracked files git does not ignore. Needs git, jq
-# and perl. Without shellcheck, or python3 with PyYAML, that check prints a skip
-# line; under CI=true a skipped check fails instead.
+# and perl. Without shellcheck, python3 with PyYAML, or node, that check prints a
+# skip line; under CI=true a skipped check fails instead.
 
 set -u
 
@@ -252,6 +252,98 @@ check_plugin_limits() {
   finish plugin-limits "$n files under plugins/sutra (limit 512); file sizes, symlinks, hook commands and manifest paths checked"
 }
 
+check_workflows() {
+  local version out parse
+  version="$(node --version 2>/dev/null)"
+  if [ -z "$version" ]; then
+    skip workflows "node not installed"
+    return
+  fi
+  parse='
+    const fs = require("node:fs");
+    const vm = require("node:vm");
+    const gap = /(?:\s|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*/y;
+    const head = /export\s+const\s+meta\s*=/y;
+    const str = /"(?:[^"\\\n\r]|\\[\s\S])*"|\x27(?:[^\x27\\\n\r]|\\[\s\S])*\x27/y;
+    const num = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?(?![\w$.])/y;
+    const word = /(?:true|false|null)(?![\w$])/y;
+    const key = /[A-Za-z_$][\w$]*/y;
+    const more = /[(\[.\x60+\-*\/%=<>&|^?,]|!=|in(?:stanceof)?(?![\w$])/y;
+    const plain = "export const meta must be a plain literal: strings, numbers, true, false, null, and arrays and objects of them with plain keys";
+    function lint(src) {
+      let i = 0;
+      const eat = (re) => {
+        re.lastIndex = i;
+        const ok = re.test(src);
+        if (ok) i = re.lastIndex;
+        return ok;
+      };
+      const fail = (why) => {
+        throw new Error(src.slice(0, i).split("\n").length + ": " + why);
+      };
+      const list = (close, item) => {
+        for (;;) {
+          eat(gap);
+          if (src[i] === close) {
+            i++;
+            return;
+          }
+          item();
+          eat(gap);
+          if (src[i] === ",") i++;
+          else if (src[i] !== close) fail(plain);
+        }
+      };
+      const value = () => {
+        eat(gap);
+        if (src[i] === "{") {
+          i++;
+          list("}", () => {
+            if (!(eat(str) || eat(num) || eat(key))) fail(plain);
+            eat(gap);
+            if (src[i] !== ":") fail(plain);
+            i++;
+            value();
+          });
+        } else if (src[i] === "[") {
+          i++;
+          list("]", value);
+        } else if (!(eat(str) || eat(num) || eat(word))) fail(plain);
+      };
+      eat(gap);
+      const start = i;
+      if (!eat(head)) fail("the first statement must be export const meta = { ... }");
+      try {
+        new vm.Script("(async function () {" + src.slice(0, start) + "      " + src.slice(start + 6) + "\n})", { filename: "workflow" });
+      } catch (err) {
+        const line = /^workflow:(\d+)$/m.exec(String(err.stack));
+        throw new Error((line ? line[1] : "?") + ": " + err.message);
+      }
+      value();
+      const close = i;
+      eat(gap);
+      if (src[i] !== ";" && i < src.length && !(/[\n\r]/.test(src.slice(close, i)) && !eat(more))) {
+        fail("export const meta must end at its literal; add a semicolon after it");
+      }
+    }
+    let count = 0;
+    for (const file of fs.readFileSync(0, "utf8").split("\0")) {
+      if (!file || !fs.lstatSync(file, { throwIfNoEntry: false })?.isFile()) continue;
+      count++;
+      try {
+        lint(fs.readFileSync(file, "utf8"));
+      } catch (err) {
+        const line = file + ":" + err.message;
+        console.log(line.replace(/\s+/g, " ").replace(/[^ -~]/g, (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0")));
+      }
+    }
+    console.log(count);
+  '
+  out="$(files ':(glob)plugins/sutra/workflows/*.js' | node -e "$parse")" || problem "node failed"
+  collect "$out"
+  finish workflows "plugins/sutra/workflows/*.js ($count) compiled inside an async function, each led by a plain-literal export const meta (node $version)"
+}
+
 check_hook_tests() { # check_hook_tests SHELL
   local out
   if out="$(BASH_UNDER_TEST="$1" bash tests/hooks.sh 2>&1 </dev/null)"; then
@@ -269,6 +361,7 @@ check_bash_syntax
 check_shellcheck
 check_frontmatter
 check_plugin_limits
+check_workflows
 check_hook_tests bash
 # macOS ships bash 3.2 as /bin/bash, and the hook must run under it.
 if [ -x /bin/bash ] && [ "$(/bin/bash -c 'echo "$BASH_VERSION"')" != "$(bash -c 'echo "$BASH_VERSION"')" ]; then

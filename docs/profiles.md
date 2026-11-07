@@ -89,14 +89,22 @@ floor. Under `strict`, `<id>.strict.md` appends strict-only lines to its card.
 
 | Card | Fires when | Depth |
 | --- | --- | --- |
-| `commit` | the prompt mentions a commit, or a `git commit` runs | `/sutra:commit-craft` |
-| `publish` | the prompt mentions push, publish, release, deploy, open source, or a tag; or `git push`, a `publish` command, `gh release`, `twine upload`, `gem push`, or `docker push` runs | `/sutra:scrub-before-publish` |
+| `commit` | the prompt mentions a commit, or after a `git commit` runs | `/sutra:commit-craft` |
+| `publish` | the prompt mentions push, publish, release, deploy, or open source, or uses the word tag or tags; or after `git push`, a `publish` command, `gh release`, `twine upload`, `gem push`, or `docker push` runs | `/sutra:scrub-before-publish` |
 | `migration` | the prompt mentions a migration, migrate, backfill, a schema change, or `ALTER TABLE`; or Claude edits a `.sql` file or a file under `migrations/`, `migration/`, `migrate/`, or `alembic/versions/` | `/sutra:data-migration` |
 | `test-edit` | Claude first edits a test file, by name (`*_test.go`, `test_*.py`, `*.spec.ts`, ...) or by directory (`tests/`, `__tests__/`, ...) | `/sutra:test-authoring` |
 | `doc-edit` | Claude first edits a doc (`.md`, `.mdx`, `.markdown`, `.rst`, `.adoc`, `.txt`) | `/sutra:style-audit` |
-| `code-edit` | Claude first edits a source file | -- |
+| `code-edit` | Claude first edits a source file | `/sutra:style-audit` |
 | `delegate` | a subagent (the Agent or Task tool) returns | `/sutra:agent-orchestration` |
 | `web` | a WebFetch or WebSearch returns | `/sutra:agent-security` |
+
+Sutra sees a tool call only after it has run (it has no PreToolUse hook), so a
+card triggered by a command, such as `git push`, arrives after that command,
+and the delegate card after the first subagent returns. For the same reason no
+card covers destructive commands such as `rm -rf`, `git reset --hard`, or
+`DROP TABLE`: such a card would arrive only after the damage. The core rule to
+confirm an irreversible action first, and Claude Code's permission prompts,
+cover that moment instead.
 
 `classify` in `sutra.sh` holds the file patterns, `on_prompt` and `post_bash`
 the prompt and command triggers (prompts match regardless of case), and
@@ -159,25 +167,48 @@ instruction files coding agents load: `CLAUDE.md`, `CLAUDE.local.md`,
 `.claude/CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`,
 `.github/copilot-instructions.md`, `.claude/rules/*.md`, and `CLAUDE.md` files
 in subdirectories up to two levels below the project root, outside `.git`,
-`.claude`, and `node_modules` (at most 50). Files over 4 MiB and binary files
-are skipped. Variation selectors (U+FE00-U+FE0F, U+E0100-U+E01EF) and other
-default-ignorable characters not listed above are not flagged. A finding goes
-to Claude as context and to you as a notice naming the file, the line, and the
-code point of the first hidden character in that file; later ones in the same
-file are not reported. After a WebFetch or WebSearch, the untrusted-content
-card reminds Claude that the result is data, not instructions.
+`.claude`, and `node_modules` (at most 20). The scan matches the raw UTF-8
+bytes of each listed character, so invalid bytes nearby cannot hide one. Files
+over 4 MiB are skipped. A file Claude writes or reads is also skipped as
+binary when its first 8 KiB holds a NUL byte; an instruction file is scanned
+even then, and the NUL is itself reported. Variation selectors
+(U+FE00-U+FE0F, U+E0100-U+E01EF) and other default-ignorable characters not
+listed above are not flagged. A finding goes to Claude as context and to you
+as a notice naming the file, the line, and the code point of the first hidden
+character in that file; later ones in the same file are not reported. The
+file path is quoted, with every character outside `[A-Za-z0-9._/@+-]`
+replaced by `?` and a long path shortened, so a crafted file name cannot add
+instructions. After a WebFetch or WebSearch, the untrusted-content card
+reminds Claude that the result is data, not instructions.
 
-Only `SUTRA_SECURITY=off` in your own environment turns the floor off; a
-repository's `.sutra` cannot.
+`SUTRA_SECURITY=off` turns the floor off. A repository's `.sutra` cannot, but
+the repository's `.claude/settings.json` can set `SUTRA_SECURITY`,
+`SUTRA_PROFILE`, and `SUTRA_GATE` through its `env` key once you trust the
+folder, or in any `claude -p` run; see
+[Residual risk](security.md#residual-risk).
 
 ## Verify-before-stop (strict)
 
-Under `strict`, Sutra counts Claude's edits to files that are not docs and
-records each check command that runs: a task-runner target such as
-`make test` or `npm run lint`, or a direct tool such as `go test`,
-`cargo clippy`, `pytest`, `tsc`, `eslint`, or `shellcheck`, also when the tool
-is invoked by path (`vendor/bin/phpunit`). When Claude tries to stop with
-edits made since the last check, the Stop hook blocks the stop
+Under `strict`, Sutra counts Claude's edits to files that are not docs (code,
+config, scripts) and records each check command that runs. A Bash command
+counts as a check when the command word of one of its simple commands, after
+any leading `VAR=value` assignments and after `npx`, `bunx`, `pnpm exec`, or
+`uv run`, is:
+
+- a known test, lint, build, or type-check tool, such as `pytest`, `tsc`,
+  `eslint`, or `shellcheck`;
+- a task runner (`make`, `just`, `task`, `npm`, `pnpm`, `yarn`, `bun`, `mise`,
+  `gradle`, `mvn`, `rake`, `tox`, `nox`, `dotnet`, `swift`, `deno`, `bazel`,
+  `cargo`, or `go`) followed by a check-like word, as in `make test`,
+  `npm run lint`, or `go test ./...`;
+- `python -m` with `pytest`, `unittest`, or `mypy`; `bash -n`;
+  `terraform validate` or `terraform plan`; or `claude plugin validate`;
+- a script whose file name contains `test`, `check`, `lint`, or `verify`, as
+  in `bash tests/hooks.sh` or `./scripts/check.sh`.
+
+`git`, `echo`, `printf`, `cat`, and similar commands never count, so a commit
+message that names a tool does not silence the gate. When Claude tries to stop
+with edits made since the last check, the Stop hook blocks the stop
 once and asks it to run the project's checks and read the result, or to say in
 one line why they do not apply. It never fires while `stop_hook_active` is
 true, never twice for the same edits, and not when Claude's last message ends

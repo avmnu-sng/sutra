@@ -35,11 +35,11 @@ own.
 
 Installs the `sutra` plugin from the `sutra` marketplace you just added.
 
-After installation, start a new session (or restart Claude Code). The
-skills then appear as `/sutra:<name>` -- for example
-`/sutra:architecture-review`. They
-will not show up mid-session; the next session start is what registers
-them.
+After installation, run `/reload-plugins` or start a new session to load the
+skills; they appear as `/sutra:<name>`, for example
+`/sutra:architecture-review`. The operating contract arrives with the next
+SessionStart event (a new or resumed session, `/clear`, or a compaction),
+because the SessionStart hook is what adds it.
 
 ## Selecting a profile
 
@@ -84,8 +84,8 @@ Profiles at a glance (each adds a layer to the one before):
   they apply (commits, publishing, migrations, test, doc, and code edits,
   delegation).
 - `strict` -- everything in `standard` plus a house style, an ASCII notice on
-  writes, and one verify-before-stop request when code changed without a
-  check.
+  writes, and one verify-before-stop request when a file that is not a doc
+  changed and no check command ran since.
 - `off` -- no contract, cards, or stop gate. The security floor
   (hidden-Unicode warnings and the untrusted-content card) still runs; only
   `SUTRA_SECURITY=off` turns it off.

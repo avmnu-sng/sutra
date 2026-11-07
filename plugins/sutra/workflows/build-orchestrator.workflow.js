@@ -171,11 +171,20 @@ async function run(prompt, opts) {
   }
 }
 
+// Git on a case-insensitive file system resolves Main, or a name in another
+// Unicode normal form, to the same ref; upper-casing first folds U+017F to s.
+function folded(name) {
+  return name.normalize("NFC").toUpperCase().toLowerCase();
+}
+
 function startProblem(intake) {
   const branch = intake.branch;
   const base = typeof intake.default_branch === "string" ? intake.default_branch.replace(/^origin\//, "") : "";
   if (typeof branch !== "string" || branch === "" || branch === "HEAD") return "no branch is checked out (detached HEAD)";
-  if (PROTECTED_BRANCHES.indexOf(branch) !== -1 || branch === base) return "the checked-out branch " + shown(branch) + " is the default branch";
+  const name = folded(branch);
+  if (name === folded(base) || PROTECTED_BRANCHES.some((protectedName) => folded(protectedName) === name)) {
+    return "the checked-out branch " + shown(branch) + " is the default branch";
+  }
   if (!isObjectId(intake.head)) return "the plan intake did not report HEAD as a full commit id";
   if (intake.clean !== true) return "the working tree has uncommitted changes";
   return "";

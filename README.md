@@ -56,8 +56,8 @@ of both.
 - **Strict house style:** ASCII-only files, file references that resolve as
   written, checks before stopping, loop watching, early handoff, and
   multi-session build gates. Strict also notes non-ASCII bytes in written files
-  and asks Claude once to run the project's checks if it changed code and ran
-  no check since.
+  and asks Claude once to run the project's checks if it edited a file that is
+  not a doc and ran no check command since.
 
 Select one (default is `standard`):
 
@@ -140,14 +140,14 @@ environment:
     after each compaction;
   - delivers short rule cards when they apply, each at most once until the
     next compaction or `/clear`: commit and publish rules when a prompt asks
-    for them or a commit or push runs; test, migration, doc, and code rules on
-    the first such edit; delegation rules after a subagent returns; an
-    untrusted-content rule after a web fetch or search;
+    for them or after a commit or push runs; test, migration, doc, and code
+    rules on the first such edit; delegation rules after a subagent returns;
+    an untrusted-content rule after a web fetch or search;
   - runs the security floor: hidden-Unicode warnings for files Claude writes
     or reads and for the instruction files loaded at session start;
   - briefs the compaction summary on what to keep;
-  - under `strict`, asks Claude once to run the project's checks if it changed
-    code and ran none since.
+  - under `strict`, asks Claude once to run the project's checks if it edited
+    a file that is not a doc and ran no check command since.
 - **Workflows** (`plugins/sutra/workflows/`) -- the resumable multi-session
   build orchestrator, a native plugin workflow you run as
   `/sutra:build-orchestrator`. See
@@ -208,10 +208,10 @@ five events: SessionStart, UserPromptSubmit, PostToolUse, PreCompact, and Stop.
   The four subagents are limited to Read, Grep, and Glob.
 - **Review before you install:** read the two hook files, or clone this
   repository and run `claude --plugin-dir ./plugins/sutra plugin details sutra`
-  to list its skills, agents, and hooks and their context cost. That list
-  leaves out the workflow script,
-  `plugins/sutra/workflows/build-orchestrator.workflow.js`; read it before you
-  run it.
+  to list its skills, agents, and hooks. Its context cost counts the skill and
+  agent listings, not the contract the hooks add, and the list leaves out the
+  workflow script, `plugins/sutra/workflows/build-orchestrator.workflow.js`;
+  read it before you run it.
 - **Turn parts off:** `SUTRA_PROFILE=off` drops the contract, cards, and stop
   gate; `SUTRA_GATE=off` drops only the stop gate; `SUTRA_SECURITY=off`
   silences the security floor.

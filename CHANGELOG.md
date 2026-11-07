@@ -27,7 +27,6 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A plugin-folder README that discloses everything the hooks run, read, and
   write; a LICENSE in the plugin folder; a 512x512 listing icon.
 - `tests/hooks.sh`, behavior tests for the dispatcher on bash 3.2 and 5.
-
 - `SECURITY.md` (private vulnerability reporting) and `docs/security.md` (the
   threat model, an OWASP mapping, and a hardening guide).
 - `scripts/check.sh`, one gate for contributors and CI: a byte-level ASCII and
@@ -36,6 +35,9 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tests.
 - CI validates the marketplace and the plugin with a pinned Claude Code CLI,
   and Dependabot keeps the pinned actions current.
+- CI runs the hook tests under macOS bash 3.2, and `scripts/check.sh`
+  compiles the bundled workflow.
+
 ### Changed
 
 - Profiles are composed from layers (`core.md`, `standard.md`, `strict.md`), so
@@ -48,14 +50,14 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Hook commands quote `${CLAUDE_PLUGIN_ROOT}` and set explicit timeouts.
 - The hooks-cookbook freshness recipe no longer fetches from a hook.
 - Validation docs use `claude plugin validate --strict --profile directory`.
-
 - The build orchestrator is a native plugin workflow, `/sutra:build-orchestrator`;
   copying it into a project is optional. It runs slices one at a time,
   commits only slices that pass independent validation, stops at the first
   slice that does not, refuses to start on invalid index rows, and frames plan
   text as data.
 - `scaffold-execution-plan` starts only when a person invokes it, and its
-  kickoff template allows a closed set of read-only git commands and plain
+  kickoff template allows a closed set of git commands (fetch, status,
+  rev-parse, log) and plain
   placeholder values.
 - `scrub-before-publish` starts with a deterministic secret scanner (gitleaks
   or trufflehog); `doc-sanitizer` is an advisory third pass that never repeats
@@ -68,6 +70,7 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and answer with structured decisions.
 - CI runs with `contents: read`, a commit-pinned `actions/checkout`, and no
   persisted credentials.
+
 ### Removed
 
 - `hooks/inject-profile.sh` and `hooks/ascii-guard.sh`, replaced by
@@ -80,9 +83,24 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The build orchestrator ran slices concurrently in one working tree, so a
   slice could commit another slice's unreviewed edits, and it committed
   slices that failed validation.
+- The strict gate counted commands that only mentioned a check tool (a commit
+  message, `cat pytest.ini`) and missed script checks such as
+  `bash tests/hooks.sh`; it now matches each simple command's command word.
+- The build orchestrator's default-branch refusal compares names after
+  Unicode normalization and case folding, so `Main` and `MASTER` are refused
+  on case-insensitive file systems.
+- The example commit hook runs git only in the project repository with
+  `core.fsmonitor` disabled, and follows here-documents and `eval`.
 
 ### Security
 
+- Padded instruction files could push the session-start scan past its hook
+  timeout, which discarded the contract and the warnings. The scan now matches
+  raw bytes and reads at most 20 subdirectory CLAUDE.md files; five 4 MiB
+  files scan in about a second.
+- A NUL byte no longer exempts an instruction file from the scan, and file
+  paths in warnings are quoted and sanitized so a crafted name cannot add
+  text Claude might follow.
 - The strict ASCII guard read written files through perl's two-argument open,
   so a file name ending in `|` ran as a shell command. Files are now opened
   with a three-argument open, and all hook JSON is parsed and built with

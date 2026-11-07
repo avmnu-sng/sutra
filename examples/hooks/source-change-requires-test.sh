@@ -12,14 +12,16 @@
 #
 #   Claude Code PreToolUse hook on Bash. It reads tool_input.command from the
 #   JSON payload and stands aside unless the command runs
-#   "git [global options] commit" in this repository. It checks the index as it
-#   stands before the command runs, plus tracked changes for commit -a, plus the
-#   whole working tree when the same command also runs git add. Block mode
-#   prints a permissionDecision "deny" whose reason Claude sees; warn mode
-#   prints a systemMessage and additionalContext. It always exits 0.
+#   "git [global options] commit" in the repository that holds
+#   $CLAUDE_PROJECT_DIR. It checks the index as it stands before the command
+#   runs, plus tracked changes for commit -a, plus the whole working tree when
+#   the same command also runs git add. Block mode prints a permissionDecision
+#   "deny" whose reason Claude sees; warn mode prints a systemMessage and
+#   additionalContext. It always exits 0.
 #
-# Tooling gaps -- no git, not a repository, no jq or perl JSON::PP to read the
-# payload, an invalid regex -- exit 0 with no output.
+# Tooling gaps -- no git, not a repository, no CLAUDE_PROJECT_DIR for a
+# PreToolUse payload, no jq or perl JSON::PP to read the payload, an invalid
+# regex -- exit 0 with no output.
 #
 # Knobs (environment variables):
 #   MODE                  warn (default) or block.
@@ -91,6 +93,15 @@ emit() {
         : { systemMessage => $msg, hookSpecificOutput => { hookEventName => "PreToolUse", additionalContext => $msg } };
       print JSON::PP->new->ascii->canonical->encode($o), "\n";' -- "$1" "$2"
   fi
+}
+
+# git_in DIR ARGS... runs git in DIR. core.fsmonitor stays off: a repository's
+# configuration can name a program there, and git starts it on reading the
+# index.
+git_in() {
+  local d="$1"
+  shift
+  git -c core.fsmonitor=false -C "$d" "$@"
 }
 
 # resolve DIR PATH prints the physical directory PATH names, taken relative to
@@ -174,27 +185,33 @@ commit_flags() {
   done
 }
 
-# drop_heredocs copies stdin to stdout without the bodies of here-documents, so
-# a "git commit" line inside a file being written is not taken for a command.
-drop_heredocs() {
-  awk -v sq="'" '
-    hd != "" { l = $0; sub(/^\t+/, "", l); if (l == hd) hd = ""; next }
-    {
-      print
-      l = $0
-      gsub(/<<</, "", l); gsub(sq, "", l); gsub(/["\\]/, "", l)
-      if (match(l, /<<-?[ \t]*[A-Za-z_][A-Za-z0-9_]*/)) {
-        hd = substr(l, RSTART, RLENGTH)
-        sub(/^<<-?[ \t]*/, "", hd)
-      }
-    }'
-}
-
 # split_commands prints each command on its own line: it splits at ; & | ( )
-# and backquotes outside quotes, drops comments, and joins the lines that an
-# open quote or a trailing backslash continues.
+# and backquotes outside quotes, drops comments and here-document bodies, and
+# joins the lines that an open quote or a trailing backslash continues. Inside
+# (( )) a << is a shift, not a here-document.
 split_commands() {
   awk -v sq="'" '
+    function heredoc(j,   s, w, d, qq) {
+      s = 0
+      if (c[j] == "-") { s = 1; j++ }
+      while (c[j] == " " || c[j] == "\t") j++
+      for (w = ""; j <= n; j++) {
+        d = c[j]
+        if (qq != "") { if (d == qq) qq = ""; else w = w d }
+        else if (d == "\"" || d == sq) qq = d
+        else if (d == "\\" && j < n) w = w c[++j]
+        else if (index(" \t;&|<>()`", d)) break
+        else w = w d
+      }
+      if (w != "") { hd[++pend] = w; strip[pend] = s }
+      return j - 1
+    }
+    nh {
+      l = $0
+      if (strip[cur]) sub(/^\t+/, "", l)
+      if (l == hd[cur] && ++cur > nh) nh = 0
+      next
+    }
     {
       n = split($0, c, ""); seg = 1
       for (i = 1; i <= n; i++) {
@@ -207,6 +224,10 @@ split_commands() {
         if (q == "") {
           if (ch == "\"" || ch == sq) q = ch
           else if (ch == "#" && (i == seg || c[i - 1] == " " || c[i - 1] == "\t")) break
+          else if (ch c[i + 1] == "((") { arith++; ch = "\n\n"; seg = ++i + 1 }
+          else if (ch c[i + 1] == "))" && arith) { arith--; ch = "\n\n"; seg = ++i + 1 }
+          else if (ch c[i + 1] c[i + 2] == "<<<") { ch = "<<<"; i += 2 }
+          else if (ch c[i + 1] == "<<" && !arith) { i = heredoc(i + 2); ch = " " }
           else if (index(";&|()`", ch)) { ch = "\n"; seg = i + 1 }
         } else if (ch == q) q = ""
         printf "%s", ch
@@ -214,16 +235,42 @@ split_commands() {
       if (cont || q != "") { cont = 0; open = 1; printf " "; next }
       open = 0
       printf "\n"
+      if (pend) { nh = pend; pend = 0; cur = 1 }
     }
     END { if (open) printf "\n" }'
 }
 
+# unquote prints its input with one level of quotes and backslashes removed:
+# the command that eval runs.
+unquote() {
+  awk -v sq="'" '
+    {
+      n = split($0, c, "")
+      for (i = 1; i <= n; i++) {
+        ch = c[i]
+        if (q == "" && (ch == "\"" || ch == sq)) q = ch
+        else if (ch == q) q = ""
+        else if (ch == "\\" && q != sq && i < n) printf "%s", c[++i]
+        else printf "%s", ch
+      }
+      printf "\n"
+    }'
+}
+
 # scan_command succeeds when $cmd runs "git [global options] commit" in the
-# repository at $top. It follows cd and git -C as text only. Never run git in a
-# directory outside this repository here: that repository's configuration could
-# run a program before the user has approved the command.
+# repository at $top. It follows cd, git -C and eval as text only: running git
+# in a directory the command names would let that repository's configuration
+# start a program before the user has approved the command.
 scan_command() {
-  local line dir="$start" tdir found=1
+  local dir="$start" found=1
+  scan_text "$cmd"
+  return "$found"
+}
+
+# scan_text TEXT reads the commands in TEXT for scan_command, updating its dir
+# and found.
+scan_text() {
+  local line tdir cw words n i
   while IFS= read -r line; do
     words=()
     read -r -a words <<< "$line"
@@ -231,20 +278,24 @@ scan_command() {
     i=0
     while [ "$i" -lt "$n" ]; do
       case "${words[$i]}" in
-        [A-Za-z_]*=*|'!'|'{'|if|elif|then|do|else|while|until|time|command|exec|nohup|env|nice|xargs) i=$((i + 1)) ;;
+        [A-Za-z_]*=*|'!'|'{'|if|elif|then|do|else|while|until|time|command|builtin|exec|nohup|env|nice|sudo|xargs) take "$i"; i=$N ;;
         *) break ;;
       esac
     done
     [ "$i" -lt "$n" ] || continue
-    case "${words[$i]}" in
+    take "$i" w
+    i=$N
+    cw="${W//\\/}"
+    case "$cw" in
+      eval)
+        [ "$i" -ge "$n" ] || scan_text "$(printf '%s\n' "${words[*]:$i}" | unquote)" ;;
       cd)
-        if [ $((i + 1)) -lt "$n" ]; then take $((i + 1)) w; else W="~"; fi
+        if [ "$i" -lt "$n" ]; then take "$i" w; else W="~"; fi
         case "$W" in
           -*) dir="" ;;
           *) [ -z "$dir" ] || dir="$(resolve "$dir" "$W")" ;;
         esac ;;
       git|*/git)
-        i=$((i + 1))
         tdir="$dir"
         while [ "$i" -lt "$n" ]; do
           case "${words[$i]}" in
@@ -264,19 +315,18 @@ scan_command() {
           commit) found=0; commit_flags $((i + 1)) ;;
         esac ;;
     esac
-  done < <(printf '%s\n' "$cmd" | drop_heredocs | split_commands |
-    grep -E '(^|[^[:alnum:]_.-])(cd|git)([^[:alnum:]_.-]|$)')
-  return "$found"
+  done < <(printf '%s\n' "$1" | split_commands |
+    grep -E '(^|[^[:alnum:]_.-])(cd|git|eval)([^[:alnum:]_.-]|$)')
 }
 
 changed_files() {
   if [ -n "$RANGE" ]; then
-    git -C "$top" diff --name-only -z "$RANGE" -- 2>/dev/null
+    git_in "$top" diff --name-only -z "$RANGE" -- 2>/dev/null
     return 0
   fi
-  git -C "$top" diff --cached --name-only -z 2>/dev/null
-  [ "$with_tracked" = 0 ] || git -C "$top" diff --name-only -z 2>/dev/null
-  [ "$with_untracked" = 0 ] || git -C "$top" ls-files -z --others --exclude-standard 2>/dev/null
+  git_in "$top" diff --cached --name-only -z 2>/dev/null
+  [ "$with_tracked" = 0 ] || git_in "$top" diff --name-only -z 2>/dev/null
+  [ "$with_untracked" = 0 ] || git_in "$top" ls-files -z --others --exclude-standard 2>/dev/null
 }
 
 payload=""
@@ -293,13 +343,17 @@ if [ -n "$payload" ]; then
   start="${vals[2]:-}"
   [ -z "$event" ] || [ "$event" = PreToolUse ] || exit 0
   case "$cmd" in *commit*) ;; *) exit 0 ;; esac
-  [ -n "$start" ] && [ -d "$start" ] || start="$PWD"
-  start="$(cd -P -- "$start" 2>/dev/null && pwd -P)" || exit 0
-  top="$(git -C "$start" rev-parse --show-toplevel 2>/dev/null)" || exit 0
+  # The repository comes from the project, never from the payload cwd: Claude
+  # can cd into a nested repository, and git would run its configuration.
+  [ -n "${CLAUDE_PROJECT_DIR:-}" ] || exit 0
+  proj="$(cd -P -- "$CLAUDE_PROJECT_DIR" 2>/dev/null && pwd -P)" || exit 0
+  top="$(git_in "$proj" rev-parse --show-toplevel 2>/dev/null)" || exit 0
   top="$(cd -P -- "$top" 2>/dev/null && pwd -P)" || exit 0
+  [ -n "$start" ] && [ -d "$start" ] || start="$proj"
+  start="$(cd -P -- "$start" 2>/dev/null && pwd -P)" || exit 0
   scan_command || exit 0
 else
-  top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+  top="$(git_in . rev-parse --show-toplevel 2>/dev/null)" || exit 0
 fi
 
 count=0
