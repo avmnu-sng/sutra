@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Behavior tests for plugins/sutra/hooks/sutra.sh.
+# Behavior tests for plugins/sutra-harness/hooks/sutra.sh.
 #   bash tests/hooks.sh                        # with the bash on PATH
 #   BASH_UNDER_TEST=/bin/bash bash tests/hooks.sh   # e.g. macOS bash 3.2
 # Needs jq. Every case runs the hook with a clean environment (env -i) against
@@ -8,7 +8,7 @@
 set -u
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
-hook="$repo/plugins/sutra/hooks/sutra.sh"
+hook="$repo/plugins/sutra-harness/hooks/sutra.sh"
 shell="$(command -v "${BASH_UNDER_TEST:-bash}")" || { echo "no shell to test with"; exit 2; }
 command -v jq >/dev/null 2>&1 || { echo "tests/hooks.sh needs jq"; exit 2; }
 
@@ -33,7 +33,7 @@ run() { # run EVENT PAYLOAD [VAR=VALUE...]
   local ev="$1" pl="$2"
   shift 2
   out="$(printf '%s' "$pl" | env -i PATH="${TEST_PATH:-$PATH}" HOME="$tmp/home" \
-    CLAUDE_PLUGIN_ROOT="$repo/plugins/sutra" CLAUDE_PLUGIN_DATA="$data" \
+    CLAUDE_PLUGIN_ROOT="$repo/plugins/sutra-harness" CLAUDE_PLUGIN_DATA="$data" \
     CLAUDE_PROJECT_DIR="$proj" "$@" "$shell" "$hook" "$ev")"
   rc=$?
   if [ "$ev" != pre-compact ] && [ -z "${TEST_PATH:-}" ] && [ -n "$out" ] &&
@@ -220,7 +220,7 @@ printf 'Build with make. \363\240\201\201\n' > "$pad/CLAUDE.md"
 perl -e 'print "\xc3\xa9\n" x 1398101' > "$pad/GEMINI.md"
 for f in .cursorrules .github/copilot-instructions.md fx/CLAUDE.md fx/b/CLAUDE.md; do cp "$pad/GEMINI.md" "$pad/$f"; done
 t0=$(perl -MTime::HiRes=time -e 'printf "%.0f", time*1000')
-out="$(printf '%s' "$(p_start s-pad)" | env -i PATH="$PATH" HOME="$tmp/home" CLAUDE_PLUGIN_ROOT="$repo/plugins/sutra" \
+out="$(printf '%s' "$(p_start s-pad)" | env -i PATH="$PATH" HOME="$tmp/home" CLAUDE_PLUGIN_ROOT="$repo/plugins/sutra-harness" \
   CLAUDE_PLUGIN_DATA="$data" CLAUDE_PROJECT_DIR="$pad" "$shell" "$hook" session-start)"
 t1=$(perl -MTime::HiRes=time -e 'printf "%.0f", time*1000')
 printf 'latency: session-start over 5 padded 4 MiB instruction files took %s ms\n' "$((t1 - t0))"
@@ -292,7 +292,7 @@ check "unsafe session id: no card" no_ctx "sutra (test edit)"
 check "unsafe session id: nothing written outside data" test ! -e "$tmp/escape"
 
 out="$(printf '%s' "$(p_tool s-nodata Write "$proj/n_test.go")" | env -i PATH="$PATH" HOME="$tmp/home" \
-  CLAUDE_PLUGIN_ROOT="$repo/plugins/sutra" CLAUDE_PROJECT_DIR="$proj" "$shell" "$hook" post-tool)"
+  CLAUDE_PLUGIN_ROOT="$repo/plugins/sutra-harness" CLAUDE_PROJECT_DIR="$proj" "$shell" "$hook" post-tool)"
 check "no plugin data dir: cards stay silent" no_ctx "sutra (test edit)"
 
 # --- strict verify-before-stop gate ---------------------------------------------------

@@ -5,11 +5,19 @@ session inherits a senior-engineer operating stance plus a set of reusable
 skills and subagents: architecture review, verification discipline,
 multi-session build orchestration, doc sanitization, and commit craft.
 
-Sutra ships as a Claude Code **plugin**, so adopting it is two commands -- no
-cloning, no copying files into your project, no editing your `CLAUDE.md`.
+Sutra ships as two Claude Code **plugins** from one marketplace, so adopting it
+is two commands -- no cloning, no copying files into your project, no editing
+your `CLAUDE.md`:
+
+- **`sutra`** -- twenty skills and four read-only subagents. Markdown only:
+  nothing in it runs on its own.
+- **`sutra-harness`** -- the operating stance, delivered by hooks: a layered
+  contract at session start, rule cards when they apply, hidden-Unicode
+  warnings, a compaction brief, and the build-orchestrator workflow. It
+  depends on `sutra`.
 
 ```
-sutra = a house style + a methodology library, delivered as a plugin.
+sutra = a house style + a methodology library, delivered as plugins.
 ```
 
 ![Sutra -- a plug-and-play agent kit for Claude Code](docs/demo.gif)
@@ -22,23 +30,29 @@ In any Claude Code session:
 
 ```
 /plugin marketplace add avmnu-sng/sutra
-/plugin install sutra@sutra
+/plugin install sutra-harness@sutra
 ```
 
-That is the whole install. On the next session start, Sutra injects its
-operating profile into context and its skills become available as
-`/sutra:<skill>`.
+That is the whole install: the harness brings `sutra` along as its
+dependency. On the next session start, the harness adds its operating profile
+to the context, and the skills are available as `/sutra:<skill>`. For the
+skills and subagents alone, with no hooks, install `sutra@sutra` instead.
 
 > New to plugins? `/plugin marketplace add <owner/repo>` registers a catalog;
 > `/plugin install <plugin>@<marketplace>` installs one plugin from it. Update
-> later with `/plugin marketplace update sutra`; remove with
-> `/plugin uninstall sutra@sutra`.
+> later with `/plugin marketplace update sutra`.
+> `claude plugin uninstall sutra-harness@sutra --prune` removes the harness and
+> the `sutra` it installed; a `sutra` you installed yourself stays (see
+> [`docs/install.md`](docs/install.md#removing)).
+
+Have `sutra` without the harness? See
+[`docs/install.md`](docs/install.md#if-only-sutra-is-installed).
 
 ## Choose a profile
 
-The operating contract is built from layers: a core that every profile except
-`off` carries, a standard stance on top of it, and a strict house style on top
-of both.
+The operating contract comes from `sutra-harness` and is built from layers: a
+core that every profile except `off` carries, a standard stance on top of it,
+and a strict house style on top of both.
 
 | Profile    | Contract                         | Cards | Verify-before-stop |
 | ---------- | -------------------------------- | ----- | ------------------ |
@@ -69,11 +83,11 @@ export SUTRA_PROFILE=strict
 echo strict > .sutra
 ```
 
-Precedence: your `SUTRA_PROFILE`, then the plugin's `profile` setting
-(`claude plugin configure sutra` shows it), then `standard`. A repository's
-`.sutra` applies only when you have made neither choice, and only to raise the
-profile to `strict`: it can never lower it or turn Sutra off, and Sutra tells
-you when it refuses one. A symlinked `.sutra` is ignored.
+Precedence: your `SUTRA_PROFILE`, then the harness's `profile` setting
+(`claude plugin configure sutra-harness@sutra` shows it), then `standard`. A
+repository's `.sutra` applies only when you have made neither choice, and only
+to raise the profile to `strict`: it can never lower it or turn Sutra off, and
+Sutra tells you when it refuses one. A symlinked `.sutra` is ignored.
 
 Set the profile to `off` to drop the contract, the cards, and the stop gate
 while keeping the skills installed. Two more switches, both read from your own
@@ -86,7 +100,7 @@ environment:
 
 ## What is inside
 
-- **Skills** (`/sutra:<name>`) -- invocable methodologies:
+- **Skills** (`sutra`, `/sutra:<name>`) -- invocable methodologies:
   - `architecture-review` -- a 7-point end-to-end review for any backend or
     service: trace requests, question choke points, test 2x/5x/10x, decompose
     elastic vs rate-limited work, weigh deployment model, quantify ROI.
@@ -99,8 +113,8 @@ environment:
   - `multi-session-build` -- gates that keep a long, multi-session build honest
     (claims-vs-built ledger, topology slice, independent completeness gate).
   - `scaffold-execution-plan` -- lay down an `execution_plan/` tree (from ready
-    templates) for a large effort, for the `/sutra:build-orchestrator`
-    workflow to drive.
+    templates) for a large effort, for the
+    `/sutra-harness:build-orchestrator` workflow to drive.
   - `scrub-before-publish` -- before open-sourcing your own code or docs, remove
     secrets and internal identifiers, and verify with a repeated search.
   - `commit-craft` -- write commit messages a future `git blame` reader will
@@ -131,11 +145,12 @@ environment:
     optimize, re-measure, and ratchet a regression guard.
   - `data-migration` -- change schemas safely on a live system via
     expand/contract, batched backfills, and reversible steps.
-- **Subagents** -- `architecture-reviewer`, `request-tracer`, `code-verifier`,
-  `doc-sanitizer`: focused workers you can dispatch by name (thin dispatchers
-  that apply the matching skill's method), each limited to Read, Grep, and
-  Glob.
-- **Harness** (`plugins/sutra/hooks/sutra.sh`) -- one hook script that:
+- **Subagents** (`sutra`) -- `architecture-reviewer`, `request-tracer`,
+  `code-verifier`, `doc-sanitizer`: focused workers you can dispatch by name
+  (thin dispatchers that apply the matching skill's method), each limited to
+  Read, Grep, and Glob.
+- **Harness** (`sutra-harness`, `plugins/sutra-harness/hooks/sutra.sh`) -- one
+  hook script that:
   - adds the layered contract (core, standard, strict) at session start and
     after each compaction;
   - delivers short rule cards when they apply, each at most once until the
@@ -148,10 +163,10 @@ environment:
   - briefs the compaction summary on what to keep;
   - under `strict`, asks Claude once to run the project's checks if it edited
     a file that is not a doc and ran no check command since.
-- **Workflows** (`plugins/sutra/workflows/`) -- the resumable multi-session
-  build orchestrator, a native plugin workflow you run as
-  `/sutra:build-orchestrator`. See
-  [`plugins/sutra/workflows/README.md`](plugins/sutra/workflows/README.md).
+- **Workflows** (`sutra-harness`, `plugins/sutra-harness/workflows/`) -- the
+  resumable multi-session build orchestrator, a native plugin workflow you run
+  as `/sutra-harness:build-orchestrator`. See
+  [`plugins/sutra-harness/workflows/README.md`](plugins/sutra-harness/workflows/README.md).
 - **Docs** (`docs/`) -- a quickstart, an install guide, the profile guide
   (layers, cards and their triggers, and the rule-to-layer mapping), a skills
   catalog (`docs/skills.md`) for picking between overlapping skills, the
@@ -165,20 +180,21 @@ environment:
 
 ## Using it in a repo that also has AGENTS.md / CLAUDE.md
 
-The plugin needs no changes to your project files -- the contract is added by
-a `SessionStart` hook. If you would rather keep the operating contract *in* your
-repo (so it travels in git for teammates who have not installed the plugin),
-you can clone or submodule Sutra and import its layers from your `CLAUDE.md`.
-Each profile file is one layer: import `core.md`, then `standard.md`, then
-`strict.md`, in that order, stopping at the profile you want. For `standard`:
+The plugins need no changes to your project files -- the contract is added by
+the harness's `SessionStart` hook. If you would rather keep the operating
+contract *in* your repo (so it travels in git for teammates who have not
+installed the plugins), you can clone or submodule Sutra and import its layers
+from your `CLAUDE.md`. Each profile file is one layer: import `core.md`, then
+`standard.md`, then `strict.md`, in that order, stopping at the profile you
+want. For `standard`:
 
 ```markdown
-@path/to/sutra/plugins/sutra/profiles/core.md
-@path/to/sutra/plugins/sutra/profiles/standard.md
+@path/to/sutra/plugins/sutra-harness/profiles/core.md
+@path/to/sutra/plugins/sutra-harness/profiles/standard.md
 ```
 
 An import carries the contract text only; the rule cards, the security floor,
-and the strict stop gate come from the plugin's hooks.
+and the strict stop gate come from the harness's hooks.
 
 Note: Claude Code `@import` resolves **local paths only**. A bare line like
 `use github.com/avmnu-sng/sutra` in `CLAUDE.md` is not fetched automatically --
@@ -187,14 +203,16 @@ the plugin marketplace is the no-clone mechanism. See
 
 ## Security model
 
-The only code Sutra runs on its own is one Bash script,
-`plugins/sutra/hooks/sutra.sh`, which `plugins/sutra/hooks/hooks.json` wires to
-five events: SessionStart, UserPromptSubmit, PostToolUse, PreCompact, and Stop.
+`sutra` runs nothing on its own: it is Markdown, and its four subagents are
+limited to Read, Grep, and Glob. The only code Sutra runs on its own is one
+Bash script in the harness, `plugins/sutra-harness/hooks/sutra.sh`, which
+`plugins/sutra-harness/hooks/hooks.json` wires to five events: SessionStart,
+UserPromptSubmit, PostToolUse, PreCompact, and Stop.
 
 - **Reads:** the hook payload on standard input; `SUTRA_PROFILE`,
-  `SUTRA_SECURITY`, `SUTRA_GATE`, and the plugin's `profile` setting; the
-  project's `.sutra` (first 64 bytes, symbolic links ignored); the profiles and
-  cards bundled with the plugin; a fixed set of agent instruction files
+  `SUTRA_SECURITY`, `SUTRA_GATE`, and the harness's `profile` setting; the
+  project's `.sutra` (first 64 bytes, symbolic links ignored); the profiles
+  and cards bundled with the harness; a fixed set of agent instruction files
   (`CLAUDE.md`, `AGENTS.md`, and others), at session start; and each file
   Claude writes or reads, up to 4 MiB, to look for hidden Unicode.
 - **Writes:** standard output (context for Claude, notices for you) and small
@@ -205,32 +223,37 @@ five events: SessionStart, UserPromptSubmit, PostToolUse, PreCompact, and Stop.
   read is scanned in place; only its name, a line number, and a code point
   leave the script. The one request it makes: under `strict`, it may ask
   Claude once per batch of edits to run the project's checks before it stops.
-  The four subagents are limited to Read, Grep, and Glob.
 - **Review before you install:** read the two hook files, or clone this
-  repository and run `claude --plugin-dir ./plugins/sutra plugin details sutra`
-  to list its skills, agents, and hooks. Its context cost counts the skill and
-  agent listings, not the contract the hooks add, and the list leaves out the
-  workflow script, `plugins/sutra/workflows/build-orchestrator.workflow.js`;
-  read it before you run it.
+  repository and run `claude --plugin-dir ./plugins plugin details sutra` and
+  `claude --plugin-dir ./plugins plugin details sutra-harness` to list the
+  skills, agents, and hooks. The context cost they print counts the skill and
+  agent listings, not the contract the hooks add, and the lists leave out the
+  workflow script,
+  `plugins/sutra-harness/workflows/build-orchestrator.workflow.js`; read it
+  before you run it.
 - **Turn parts off:** `SUTRA_PROFILE=off` drops the contract, cards, and stop
   gate; `SUTRA_GATE=off` drops only the stop gate; `SUTRA_SECURITY=off`
-  silences the security floor.
+  silences the security floor. Or install only `sutra`, and nothing runs.
 
-The plugin's own [`README.md`](plugins/sutra/README.md) is the full disclosure
-of what runs and what it touches. [`docs/security.md`](docs/security.md) is the
-threat model: assets, trust boundaries, residual risk, an OWASP mapping, and a
-hardening guide. To report a vulnerability, follow [`SECURITY.md`](SECURITY.md):
-use GitHub's private vulnerability reporting, not a public issue.
+Each plugin's own README is its disclosure:
+[`plugins/sutra/README.md`](plugins/sutra/README.md) for the skills, and
+[`plugins/sutra-harness/README.md`](plugins/sutra-harness/README.md) for what
+the harness runs and what it touches. [`docs/security.md`](docs/security.md) is
+the threat model: assets, trust boundaries, residual risk, an OWASP mapping,
+and a hardening guide. To report a vulnerability, follow
+[`SECURITY.md`](SECURITY.md): use GitHub's private vulnerability reporting, not
+a public issue.
 
 ## Compatibility
 
-Sutra targets current Claude Code (plugin marketplaces, hooks, and
-`${CLAUDE_PLUGIN_ROOT}`). If `/plugin` is missing, update Claude Code. The hook
-script needs `bash` 3.2 or later and `perl` with its core JSON::PP module, both
-present on macOS and most Linux. Each hook degrades to silence when its tooling
-is missing: without perl the contract and the compaction brief are still
-printed as plain text and everything else stays silent, and without the plugin
-data directory (`CLAUDE_PLUGIN_DATA`) the cards and the stop gate stay silent.
+Sutra targets current Claude Code (plugin marketplaces, plugin dependencies,
+hooks, and `${CLAUDE_PLUGIN_ROOT}`). If `/plugin` is missing, update Claude
+Code. The harness's hook script needs `bash` 3.2 or later and `perl` with its
+core JSON::PP module, both present on macOS and most Linux. Each hook degrades
+to silence when its tooling is missing: without perl the contract and the
+compaction brief are still printed as plain text and everything else stays
+silent, and without the plugin data directory (`CLAUDE_PLUGIN_DATA`) the cards
+and the stop gate stay silent.
 
 ## License
 

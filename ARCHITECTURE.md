@@ -7,7 +7,7 @@ How Sutra is put together, and why it is shaped this way.
 Claude Code can be extended two ways: standalone `.claude/` files in one
 project, or a **plugin** distributed through a marketplace. Only the plugin
 path gives you install-once, no-clone, versioned, auto-updating distribution.
-So Sutra is a plugin.
+So Sutra is a plugin -- two, in fact, from one marketplace.
 
 But a plugin cannot ship a `CLAUDE.md` (there is no "inject this memory"
 plugin field). Sutra works around that, and ships its workflow natively:
@@ -19,16 +19,39 @@ plugin field). Sutra works around that, and ships its workflow natively:
 - **Workflows** need no workaround: a plugin ships them natively. Claude Code
   loads every script in the plugin's `workflows/` directory and namespaces it
   by plugin name, so the orchestrator whose `meta.name` is
-  `build-orchestrator` runs as `/sutra:build-orchestrator`. `meta` must be the
-  first statement and a plain object literal (no variables, function calls,
-  spreads, or string concatenation), or Claude Code drops the command from `/`
-  autocomplete.
+  `build-orchestrator` runs as `/sutra-harness:build-orchestrator`. `meta`
+  must be the first statement and a plain object literal (no variables,
+  function calls, spreads, or string concatenation), or Claude Code drops the
+  command from `/` autocomplete.
 
-## One plugin, layered profiles
+## Two plugins, split at the trust boundary
 
-Rather than ship several plugins (core, strict, ...) that a user must install
-in the right combination, Sutra ships **one** plugin and composes its operating
-contract from three layer files under `profiles/`:
+| Plugin | Holds | Runs on its own | Distributed through |
+| --- | --- | --- | --- |
+| `sutra` | 20 skills, 4 read-only subagents, the icon | nothing | Anthropic's plugin directory and this repository's marketplace |
+| `sutra-harness` | the hook script, contract layers, rule cards, the build-orchestrator workflow | five hooks; the workflow when you invoke it | this repository's marketplace only |
+
+The split follows what runs code. Anthropic's plugin directory accepts hooks,
+workflow scripts, and files other than Markdown, text, JSON, YAML, and a few
+image types only from Verified organizations, so everything that runs on its
+own lives in `sutra-harness`, and `sutra` stays Markdown only. That also gives
+a reader one folder to audit for code: `plugins/sutra-harness`.
+`check_directory_policy` in `scripts/check.sh` keeps it that way by failing
+on any hook (a file, or a `hooks` key in skill frontmatter), workflow,
+server, script, shell command a skill runs when it loads, package manager
+file, or other file type in `plugins/sutra`.
+
+`sutra-harness` declares `"dependencies": ["sutra"]`, a bare name that resolves
+in the same marketplace: its cards and contract point Claude at `sutra`
+skills for depth, so installing the harness installs both, and Claude Code
+disables the harness while `sutra` is missing or disabled. Both plugins carry
+one version and release together; `check_manifests` fails when they differ.
+
+## Layered profiles
+
+Rather than ship several harness plugins (core, strict, ...) that a user must
+install in the right combination, the harness composes its operating contract
+from three layer files under `profiles/`:
 
 | Profile    | Layers                                  |
 | ---------- | --------------------------------------- |
@@ -39,19 +62,18 @@ contract from three layer files under `profiles/`:
 
 `compose` in `hooks/sutra.sh` concatenates the layers, so moving up a profile
 never removes a rule, only adds a layer, and each rule lives in exactly one
-layer. One plugin keeps the install to two commands and makes "turn the rigor
-up" a one-word change.
+layer. "Turn the rigor up" stays a one-word change.
 
 The user chooses the profile: the `SUTRA_PROFILE` environment variable first,
-then the plugin's `profile` setting (a `userConfig` option in `plugin.json`,
-which Claude Code passes to hooks as `CLAUDE_PLUGIN_OPTION_PROFILE`), then
-`standard`. With no user choice, a repository's `.sutra` file may raise the
-profile to `strict` but never lower it or turn Sutra off: a repository is
-content the user did not write, so it can ask for more rigor but cannot weaken
-the contract the user runs under. Sutra reports a refused downgrade to the user
-at session start, reads only the first 64 bytes of `.sutra`, and ignores it
-when it is a symbolic link, so a repository cannot point Sutra at a file
-outside it.
+then the harness's `profile` setting (a `userConfig` option in its
+`plugin.json`, which Claude Code passes to its hooks as
+`CLAUDE_PLUGIN_OPTION_PROFILE`), then `standard`. With no user choice, a
+repository's `.sutra` file may raise the profile to `strict` but never lower
+it or turn Sutra off: a repository is content the user did not write, so it
+can ask for more rigor but cannot weaken the contract the user runs under.
+Sutra reports a refused downgrade to the user at session start, reads only the
+first 64 bytes of `.sutra`, and ignores it when it is a symbolic link, so a
+repository cannot point Sutra at a file outside it.
 
 The invariant: Sutra never blocks a tool call. Under `strict` it may ask the
 agent, at most once per batch of edits, to run the project's checks before it
@@ -61,10 +83,10 @@ belongs in a pre-commit check or CI that the project owns.
 
 ## Harness
 
-All hook behavior is one Bash script, `hooks/sutra.sh`, which
-`hooks/hooks.json` runs with one argument per event and a 5 to 10 second
-timeout. Context for Claude goes out as `additionalContext`, notices for the
-user as `systemMessage`.
+All hook behavior is one Bash script, `hooks/sutra.sh` in
+`plugins/sutra-harness`, which `hooks/hooks.json` runs with one argument per
+event and a 5 to 10 second timeout. Context for Claude goes out as
+`additionalContext`, notices for the user as `systemMessage`.
 
 | Event | Role | What `sutra.sh` does |
 | --- | --- | --- |
@@ -122,12 +144,19 @@ any `claude -p` run (see Residual risk in `docs/security.md`).
 
 ```
 sutra/
-  .claude-plugin/marketplace.json     # the catalog (name: sutra)
-  plugins/sutra/
-    .claude-plugin/plugin.json        # the plugin manifest and profile setting
-    README.md                         # what the plugin runs, reads, writes
+  .claude-plugin/marketplace.json     # the catalog (name: sutra), both plugins
+  plugins/sutra/                      # skills plugin: Markdown only
+    .claude-plugin/plugin.json        # the manifest, with listing fields
+    README.md                         # what the plugin holds and touches
     LICENSE                           # the plugin's license (MIT)
     assets/icon.png                   # the listing icon
+    skills/<name>/SKILL.md            # invocable methodologies (/sutra:<name>)
+    agents/<name>.md                  # subagents (thin dispatchers)
+  plugins/sutra-harness/              # harness plugin: depends on sutra
+    .claude-plugin/plugin.json        # manifest: dependency, profile setting
+    README.md                         # what the plugin runs, reads, writes
+    LICENSE                           # the plugin's license (MIT)
+    assets/icon.png                   # the same icon, for the validator
     hooks/
       hooks.json                      # wires five events to sutra.sh
       sutra.sh                        # the hook dispatcher (all hook code)
@@ -136,18 +165,19 @@ sutra/
       standard.md                     # added under standard and strict
       strict.md                       # added under strict
     cards/<id>.md                     # rule cards (+ <id>.strict.md add-ons)
-    skills/<name>/SKILL.md            # invocable methodologies (/sutra:<name>)
-    agents/<name>.md                  # dispatchable subagents (thin dispatchers)
-    workflows/<name>.workflow.js      # workflows, run as /sutra:<meta.name>
+    workflows/<name>.workflow.js      # run as /sutra-harness:<meta.name>
+  scripts/check.sh                    # the checks CI runs
   tests/hooks.sh                      # behavior tests for sutra.sh
   docs/                               # install guide, profile guide, architect persona
   examples/                           # sample CLAUDE.md, AGENTS.md, settings, opt-in hooks
 ```
 
-Everything a plugin references at runtime lives inside the plugin directory,
-because Claude Code copies a plugin into a cache on install -- paths that reach
-outside the plugin (`../`) would not resolve. Hook commands use
-`${CLAUDE_PLUGIN_ROOT}` to find their scripts in that cache.
+Everything a plugin references at runtime lives inside its own directory,
+because Claude Code copies each plugin into a cache on install -- paths that
+reach outside the plugin (`../`), including into the other plugin, would not
+resolve. That is why the profiles and cards live beside the hook script that
+reads them. Hook commands use `${CLAUDE_PLUGIN_ROOT}` to find their scripts in
+that cache.
 
 ## Skills, profiles, and docs
 
@@ -167,14 +197,16 @@ Guidance appears at layered depths, by design:
 - **Skill** (`skills/<name>/SKILL.md`) -- the actionable checklist for one
   methodology, pulled in on demand when you invoke it or when the task matches
   its description. The skill and agent listings cost about 1,620 tokens, the
-  figure `claude --plugin-dir ./plugins/sutra plugin details sutra` prints; it
-  counts the hooks as free, so it leaves out the contract and the cards above.
+  figure `claude --plugin-dir ./plugins/sutra plugin details sutra` prints.
+  `plugin details sutra-harness` counts the hooks as free, so neither figure
+  includes the contract and the cards above.
 - **Docs** (`docs/`) -- long-form references that stand alone outside Claude
   Code: the architect persona and the profile guide.
 
 This is progressive disclosure: sessions pay for the contract by default, for
 a card when its moment arrives, and for a skill's full procedure only when the
-work calls for it.
+work calls for it. With only `sutra` installed, a session pays for the skill
+and agent listings alone.
 
 ## Extending Sutra
 
@@ -182,28 +214,35 @@ work calls for it.
   `description` frontmatter line. It becomes `/sutra:<name>`.
 - Add a subagent: drop a Markdown file with agent frontmatter in
   `plugins/sutra/agents/`.
-- Add a rule that is always true to one profile layer: `core.md` if every
-  profile except `off` should carry it, `standard.md` for `standard` and
-  `strict`, `strict.md` for `strict` only. Never repeat it in a higher layer;
-  the higher profiles already compose the lower ones.
+- Keep `plugins/sutra` Markdown only. Anything that runs -- a hook, a script,
+  a workflow, a shell command in a skill, an MCP or LSP server -- goes in
+  `plugins/sutra-harness`; `check_directory_policy` fails otherwise.
+- Add a rule that is always true to one profile layer in
+  `plugins/sutra-harness/profiles/`: `core.md` if every profile except `off`
+  should carry it, `standard.md` for `standard` and `strict`, `strict.md` for
+  `strict` only. Never repeat it in a higher layer; the higher profiles
+  already compose the lower ones.
 - Add a rule that matters at one moment (a commit, a kind of edit, a tool
   result) as a card: write `cards/<id>.md` (and `cards/<id>.strict.md` for
-  strict-only lines), call `card <id>` from the matching handler in
-  `hooks/sutra.sh` (`on_prompt`, `post_edit`, `post_bash`, or `on_post_tool`),
-  and add a case to `tests/hooks.sh`.
+  strict-only lines) in `plugins/sutra-harness`, call `card <id>` from the
+  matching handler in `hooks/sutra.sh` (`on_prompt`, `post_edit`, `post_bash`,
+  or `on_post_tool`), and add a case to `tests/hooks.sh`.
 - Test the harness: `bash tests/hooks.sh`, and
   `BASH_UNDER_TEST=/bin/bash bash tests/hooks.sh` for macOS bash 3.2. The suite
   needs `jq`.
-- Validate before publishing: `claude plugin validate --strict .` at the repo
-  root, and `claude plugin validate --strict --profile directory ./plugins/sutra`
-  for the plugin itself.
+- Validate before publishing: `bash scripts/check.sh`, then
+  `claude plugin validate --strict .` at the repo root,
+  `claude plugin validate --strict ./plugins/sutra-harness`, and
+  `claude plugin validate --strict --profile directory ./plugins/sutra` for the
+  plugin the directory receives.
 
 ## Compatibility notes
 
-- Plugin marketplaces, hook context injection (`additionalContext`, and
-  `SessionStart` stdout), `${CLAUDE_PLUGIN_ROOT}`, and `${CLAUDE_PLUGIN_DATA}`
-  are the load-bearing features. They are current Claude Code capabilities;
-  older builds without `/plugin` cannot install Sutra.
+- Plugin marketplaces, plugin dependencies, hook context injection
+  (`additionalContext`, and `SessionStart` stdout), `${CLAUDE_PLUGIN_ROOT}`,
+  and `${CLAUDE_PLUGIN_DATA}` are the load-bearing features. They are current
+  Claude Code capabilities; older builds without `/plugin` cannot install
+  Sutra.
 - `hooks/sutra.sh` runs on bash 3.2 or later (the `/bin/bash` macOS ships) and
   uses perl with its core JSON::PP module to read hook payloads and write hook
   output.

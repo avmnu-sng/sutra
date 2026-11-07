@@ -5,13 +5,17 @@ what Sutra protects, where it takes input it does not control, what its hook
 script does at each of those boundaries, and what it leaves to you. To report a
 vulnerability, follow [SECURITY.md](../SECURITY.md).
 
-The only code Sutra runs on its own is one Bash script,
-[`plugins/sutra/hooks/sutra.sh`](../plugins/sutra/hooks/sutra.sh), which
-[`hooks.json`](../plugins/sutra/hooks/hooks.json) runs at SessionStart,
-UserPromptSubmit, PostToolUse, PreCompact, and Stop. One workflow script runs
-only when you invoke it, and the rest of the plugin is text Claude reads as
-instructions (profiles, rule cards, skills, subagents). Sutra adds rules and
-warnings to a session; it enforces nothing.
+Sutra is two plugins. `sutra`, the skills plugin, is Markdown only: skills,
+subagents, and an icon, with nothing that runs on its own. `sutra-harness`
+holds the only code Sutra runs on its own, one Bash script,
+[`plugins/sutra-harness/hooks/sutra.sh`](../plugins/sutra-harness/hooks/sutra.sh),
+which [`hooks.json`](../plugins/sutra-harness/hooks/hooks.json) runs at
+SessionStart, UserPromptSubmit, PostToolUse, PreCompact, and Stop. One
+workflow script, also in the harness, runs only when you invoke it, and the
+rest is text Claude reads as instructions (profiles, rule cards, skills,
+subagents). Sutra adds rules and warnings to a session; it enforces nothing.
+Except where a section names the skills plugin, this page is about the
+harness.
 
 ## Assets
 
@@ -65,7 +69,7 @@ kinds of file from it.
 
 - **`.sutra`** (`resolve_profile`). At most its first 64 bytes are read, and
   a symbolic link is ignored. It applies only when you have set neither
-  `SUTRA_PROFILE` nor the plugin's `profile` setting, and the one value it can
+  `SUTRA_PROFILE` nor the harness's `profile` setting, and the one value it can
   apply is `strict`. A `.sutra` asking for `lite` or `off` is then refused and
   reported to you at session start; any other content is ignored.
 - **Instruction files** (`scan_instructions`). At session start Sutra scans
@@ -103,8 +107,8 @@ Installing Sutra means trusting its code and its text with your privileges.
 - The four subagents (`architecture-reviewer`, `code-verifier`,
   `doc-sanitizer`, `request-tracer`) are limited to Read, Grep, and Glob.
 - The build orchestrator runs only when you invoke
-  `/sutra:build-orchestrator`. Its agents edit files in your working tree,
-  and its commit stage commits each validated slice to the checked-out
+  `/sutra-harness:build-orchestrator`. Its agents edit files in your working
+  tree, and its commit stage commits each validated slice to the checked-out
   branch. Its prompts forbid pushing, creating or switching branches,
   touching the default branch, and editing CI, hooks, settings, or
   `.mcp.json` unless a slice's brief requires it, and they hand the agents
@@ -112,7 +116,7 @@ Installing Sutra means trusting its code and its text with your privileges.
   are prompts, and its branch and clean-tree checks rely on what its agents
   report; neither restricts a tool. Your permission rules and sandbox decide
   what the agents can do, so run it only on a plan you wrote or reviewed. See
-  [`plugins/sutra/workflows/README.md`](../plugins/sutra/workflows/README.md).
+  [`plugins/sutra-harness/workflows/README.md`](../plugins/sutra-harness/workflows/README.md).
 - The hooks in [`examples/hooks/`](../examples/hooks/) are not part of the
   plugin. They run only if you wire them into your own settings; review them
   as you would any hook.
@@ -194,7 +198,7 @@ sections of the [agent-security skill](../plugins/sutra/skills/agent-security/SK
 | OWASP risk | Sutra control | Left to you | Skill section |
 | --- | --- | --- | --- |
 | LLM01 Prompt Injection | The core contract's rule that content is data, not instructions; the untrusted-content card after the first WebFetch or WebSearch; hidden-Unicode warnings on files Claude writes or opens with Read, and on instruction files at session start | Injection in visible text and in content Sutra does not scan: remove a leg of the lethal trifecta rather than rely on detection | 1, 2, 3 |
-| LLM03 Supply Chain | One hook script with no network calls and plain ASCII text files, both reviewable before install; the vetting procedure for plugins, MCP servers, and skills; `/sutra:security-hygiene` for dependencies | Reviewing Sutra itself, and pinning or re-reviewing each update | 4, 7 |
+| LLM03 Supply Chain | A skills plugin that ships no code; one hook script with no network calls, in a separate plugin; plain ASCII text files; all reviewable before install. The vetting procedure for plugins, MCP servers, and skills; `/sutra:security-hygiene` for dependencies | Reviewing Sutra itself, and pinning or re-reviewing each update | 4, 7 |
 | LLM06 Excessive Agency | Read-only subagents limited to Read, Grep, and Glob; the core rule to confirm an irreversible or outward-facing action first; guidance on deny rules, the sandbox, and scoped tokens | Enforcement: Sutra blocks nothing, while permission rules, the sandbox, and containers do | 1, 5, 6 |
 
 The incidents behind each row are in the skill's
@@ -203,14 +207,15 @@ The incidents behind each row are in the skill's
 ## Hardening
 
 1. **Review before you install.** Clone the repository and run
-   `claude --plugin-dir ./plugins/sutra plugin details sutra` to list its
-   skills, agents, and hooks; the list leaves out the workflow,
-   `plugins/sutra/workflows/build-orchestrator.workflow.js`. Read
-   `plugins/sutra/hooks/hooks.json` and `plugins/sutra/hooks/sutra.sh`, the
-   only code that runs on its own, and read the workflow before you first run
-   it. Confirm every text file is plain printable ASCII, so none can hide
-   characters: `LC_ALL=C grep -rlI '[^[:print:][:space:]]' plugins/sutra`
-   prints nothing.
+   `claude --plugin-dir ./plugins plugin details sutra` and
+   `claude --plugin-dir ./plugins plugin details sutra-harness` to list the
+   skills, agents, and hooks; the lists leave out the workflow,
+   `plugins/sutra-harness/workflows/build-orchestrator.workflow.js`. Read
+   `plugins/sutra-harness/hooks/hooks.json` and
+   `plugins/sutra-harness/hooks/sutra.sh`, the only code that runs on its own,
+   and read the workflow before you first run it. Confirm every text file is
+   plain printable ASCII, so none can hide characters:
+   `LC_ALL=C grep -rlI '[^[:print:][:space:]]' plugins` prints nothing.
 2. **Pin, and re-review on update.** Sutra's marketplace is a third-party
    one, so Claude Code leaves auto-update off for it unless you turn it on
    (`/plugin`, **Marketplaces** tab). Keep it off, or pin a release when you
@@ -218,8 +223,11 @@ The incidents behind each row are in the skill's
    tag can be moved, so note the commit it points to when you review
    (`git rev-parse 'vX.Y.Z^{commit}'` in your clone). Before each update,
    read the release's entry in [CHANGELOG.md](../CHANGELOG.md) and the diff
-   of `plugins/sutra/` since that commit; repeat step 1 if anything under
-   `hooks/` or `workflows/` changed.
+   of `plugins/` since that commit; repeat step 1 if anything under
+   `plugins/sutra-harness/hooks/` or `plugins/sutra-harness/workflows/`
+   changed. A pinned marketplace stays on its tag; to move to a newer
+   release, remove it and add it again at the new tag, as `docs/install.md`
+   shows under Updating.
 3. **Start from the example settings, and know their limits.**
    [`examples/settings.json`](../examples/settings.json) denies `rm -rf`,
    force pushes, and reads of `.env` files, `secrets/`, private keys, and the

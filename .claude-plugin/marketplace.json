@@ -3,12 +3,12 @@
   "owner": {
     "name": "avmnu-sng"
   },
-  "description": "Sutra -- a plug-and-play agent kit for Claude Code: senior-engineer methodologies, skills, subagents, and layered operating profiles.",
+  "description": "Sutra -- a plug-and-play agent kit for Claude Code: senior-engineer methodology skills and subagents, plus an optional harness that adds layered operating profiles through hooks.",
   "plugins": [
     {
       "name": "sutra",
       "source": "./plugins/sutra",
-      "description": "A senior-engineer operating system for Claude Code: architecture-review, verification, multi-session build, doc-sanitization, and commit-craft skills and subagents, plus layered lite/standard/strict profiles.",
+      "description": "Senior-engineer methodology skills and read-only subagents: architecture review, verification, test authoring, debugging, data migration, multi-session builds, agent security, and commit craft. Markdown only.",
       "category": "workflow",
       "keywords": [
         "agent-kit",
@@ -16,14 +16,34 @@
         "methodology",
         "skills",
         "subagents",
-        "workflows",
         "code-review",
-        "architecture"
+        "architecture",
+        "security"
       ],
       "tags": [
         "agent-kit",
         "claude-code",
         "methodology",
+        "skills"
+      ]
+    },
+    {
+      "name": "sutra-harness",
+      "source": "./plugins/sutra-harness",
+      "description": "The automatic half of Sutra: the layered operating contract, rule cards, hidden-Unicode warnings, a compaction brief, a verify-before-stop nudge under strict, and the build-orchestrator workflow. Installs sutra as a dependency.",
+      "category": "workflow",
+      "keywords": [
+        "agent-kit",
+        "claude-code",
+        "hooks",
+        "profiles",
+        "workflows",
+        "security"
+      ],
+      "tags": [
+        "agent-kit",
+        "claude-code",
+        "hooks",
         "profiles"
       ]
     }

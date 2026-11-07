@@ -1,7 +1,7 @@
 {
   "name": "sutra",
-  "description": "A senior-engineer operating system for Claude Code -- architecture review, verification discipline, multi-session build orchestration, doc sanitization, and commit craft, delivered as skills, subagents, and layered lite/standard/strict profiles.",
-  "version": "0.2.0",
+  "description": "Senior-engineer methodology for Claude Code: twenty skills and four read-only subagents for architecture review, verification, test authoring, debugging, data migration, multi-session builds, agent security, and commit craft. Markdown only, with no hooks, scripts, or servers.",
+  "version": "0.3.0",
   "author": {
     "name": "avmnu-sng"
   },
@@ -11,20 +11,14 @@
   "icon": "./assets/icon.png",
   "documentationUrl": "https://github.com/avmnu-sng/sutra#readme",
   "supportUrl": "https://github.com/avmnu-sng/sutra/issues",
-  "userConfig": {
-    "profile": {
-      "type": "string",
-      "title": "Sutra profile",
-      "description": "lite, standard, strict, or off. Empty means standard, which a repository's .sutra file may raise to strict. The SUTRA_PROFILE environment variable overrides this setting.",
-      "default": ""
-    }
-  },
   "keywords": [
     "agent-kit",
     "claude-code",
     "methodology",
     "skills",
     "subagents",
-    "workflows"
+    "code-review",
+    "architecture",
+    "security"
   ]
 }

@@ -16,13 +16,16 @@ Open any Claude Code session and run:
 
 ```
 /plugin marketplace add avmnu-sng/sutra
-/plugin install sutra@sutra
+/plugin install sutra-harness@sutra
 ```
 
 The first command registers the Sutra marketplace with your Claude Code
-install -- it only tells Claude Code where to find the plugin. The second
-installs the `sutra` plugin from that marketplace. That is the whole install:
-no clone, no copied files, no edits to your `CLAUDE.md`.
+install -- it only tells Claude Code where to find the plugins. The second
+installs `sutra-harness`, which adds the operating contract and the checks
+this walkthrough shows, and with it, as its dependency, `sutra`, the skills
+and subagents. That is the whole install: no clone, no copied files, no edits
+to your `CLAUDE.md`. (`/plugin install sutra@sutra` alone gives you the skills
+without any hooks; steps 2, 3, and 5 below need the harness.)
 
 If `/plugin` is not recognized, your Claude Code build is too old -- update it
 and retry.
@@ -69,7 +72,7 @@ real code path before theorizing, and quantify trade-offs with numbers).
 Three profiles ship, built from layers: `lite` is the core, `standard`
 (default) adds the standard stance and the rule cards, and `strict` adds a
 house style on top of both. Your own choice wins: the `SUTRA_PROFILE`
-environment variable, then the plugin's `profile` setting, then the default.
+environment variable, then the harness's `profile` setting, then the default.
 
 ```bash
 # Globally, for this shell:

@@ -5,16 +5,19 @@
   parts you do not need, and replace every PLACEHOLDER path/value below.
 
   What this file is for:
-  Adopting the `sutra` profile in-repo so that teammates who have NOT
-  installed the sutra plugin still pick up its guidance automatically when
-  they open this project in Claude Code.
+  Adopting the Sutra profile in-repo so that teammates who have NOT
+  installed the `sutra-harness` plugin still pick up its guidance
+  automatically when they open this project in Claude Code.
 
   You usually do NOT need this file.
-  If the sutra plugin is installed in a teammate's Claude Code, the profile
+  If `sutra-harness` is installed in a teammate's Claude Code, the profile
   is already active for them globally -- no CLAUDE.md change is required.
-  Use the in-repo approach below only when you want the profile to travel
-  WITH the repository (e.g. for contributors who have not installed the
-  plugin, or for CI/agent runs that start from a clean checkout).
+  The `sutra` plugin alone (for example, a copy from Anthropic's plugin
+  directory) carries skills and subagents only, with no profile; those
+  teammates need Option A. Use the in-repo approach below when you want the
+  profile to travel WITH the repository (e.g. for contributors who have not
+  installed the harness, or for CI/agent runs that start from a clean
+  checkout).
 -->
 
 <!--
@@ -26,7 +29,7 @@
   `core.md` then `standard.md` (the two lines below) is "standard", and
   adding `strict.md` after both is "strict". An import carries the contract
   text only; the rule cards, hidden-Unicode warnings, and strict stop gate
-  come from the plugin's hooks.
+  come from the `sutra-harness` plugin's hooks.
 
   IMPORTANT: @import resolves LOCAL PATHS ONLY. It cannot fetch a URL or a
   remote git ref. The path must exist on disk relative to this file at the
@@ -35,29 +38,30 @@
 
   Replace the PLACEHOLDER path with wherever you vendored sutra.
 -->
-@vendor/sutra/plugins/sutra/profiles/core.md
-@vendor/sutra/plugins/sutra/profiles/standard.md
+@vendor/sutra/plugins/sutra-harness/profiles/core.md
+@vendor/sutra/plugins/sutra-harness/profiles/standard.md
 
 <!--
   OPTION B -- ask for the strict profile with a `.sutra` marker file
-  (plugin users).
+  (`sutra-harness` users).
 
-  If teammates DO have the sutra plugin installed, you can skip the @import
-  entirely. Instead, drop a file named `.sutra` at the repo root whose only
-  contents are:
+  If teammates DO have the `sutra-harness` plugin installed, you can skip the
+  @import entirely. Instead, drop a file named `.sutra` at the repo root
+  whose only contents are:
 
       strict
 
-  The plugin raises the profile to strict for anyone who has not chosen a
-  profile themselves (SUTRA_PROFILE or the plugin's profile setting). A
+  The harness raises the profile to strict for anyone who has not chosen a
+  profile themselves (SUTRA_PROFILE or the harness's profile setting). A
   repository can only raise the profile: a `.sutra` naming lite or off is
   refused, and standard is already the default.
   This is the lightest-touch option, but it only affects people who already
-  have the plugin -- it does nothing for a clean checkout without the plugin.
+  have the harness -- it does nothing for a clean checkout without it, or
+  for someone with only the `sutra` skills plugin.
 
   Rule of thumb:
-    - Want the profile to work for everyone, plugin or not -> Option A.
-    - Everyone on the team has the plugin and you want strict -> Option B
+    - Want the profile to work for everyone, harness or not -> Option A.
+    - Everyone on the team has the harness and you want strict -> Option B
       (a one-line `.sutra`); for standard you need neither.
   Do not use both at once; pick one so there is a single source of truth.
 -->

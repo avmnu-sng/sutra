@@ -68,8 +68,9 @@ check_ascii() {
     use strict;
     use warnings;
     my %binary = (
-      "docs/demo.gif"                 => "GIF8",
-      "plugins/sutra/assets/icon.png" => "\x89PNG\r\n\x1a\n",
+      "docs/demo.gif"                         => "GIF8",
+      "plugins/sutra/assets/icon.png"         => "\x89PNG\r\n\x1a\n",
+      "plugins/sutra-harness/assets/icon.png" => "\x89PNG\r\n\x1a\n",
     );
     my $bad = qr/[^\t\n\r\x20-\x7e]|\r(?!\n)/;
     my ($count, %seen) = (0);
@@ -106,7 +107,7 @@ check_ascii() {
   '
   out="$(files | perl -e "$scan")" || problem "the byte scan failed"
   collect "$out"
-  finish ascii "$count files scanned for NUL, control and non-ASCII bytes; allowlisted binaries: docs/demo.gif, plugins/sutra/assets/icon.png"
+  finish ascii "$count files scanned for NUL, control and non-ASCII bytes; allowlisted binaries: docs/demo.gif and each plugin's assets/icon.png"
 }
 
 check_json() {
@@ -207,49 +208,187 @@ check_frontmatter() {
   finish frontmatter "$skills skills checked for a description, $agents agents for a name and a description"
 }
 
-check_plugin_limits() {
-  local f n=0 size line
-  local hooks=plugins/sutra/hooks/hooks.json manifest=plugins/sutra/.claude-plugin/plugin.json
-  shopt -s nocasematch
-  while IFS= read -r -d '' f; do
-    if [ ! -e "$f" ] && [ ! -L "$f" ]; then continue; fi
+plugin_dirs() { # the plugin folders marketplace.json lists, one per line
+  jq -r '.plugins[].source | strings | select(startswith("./")) | ltrimstr("./")' .claude-plugin/marketplace.json
+}
+
+check_manifests() {
+  local market=.claude-plugin/marketplace.json name src manifest version v line names versions=() n=0
+  names="$(jq -c '[.plugins[].name]' "$market")"
+  while IFS=$'\t' read -r name src; do
     n=$((n + 1))
-    if [ -L "$f" ]; then
-      problem "$f: symlink"
-      continue
-    fi
-    if [ ! -f "$f" ]; then
-      problem "$f: not a regular file"
-      continue
-    fi
-    case "$f" in
-      *.png | *.jpg | *.jpeg | *.gif | *.webp | *.svg | *.ico | *.bmp | *.avif | \
-        *.woff | *.woff2 | *.ttf | *.otf | *.eot) continue ;;
+    manifest="${src#./}/.claude-plugin/plugin.json"
+    case "$src" in
+      ./plugins/"$name") ;;
+      *) problem "$market: $name: source $src is not ./plugins/$name" ;;
     esac
-    size=$(($(wc -c <"$f")))
-    [ "$size" -lt 262144 ] || problem "$f: $size bytes, and a file other than an image or font must be under 256 KiB"
-  done < <(files plugins/sutra)
+    if ! regular "$manifest"; then
+      problem "$market: $name: $manifest is missing"
+      continue
+    fi
+    [ "$(jq -r '.name' "$manifest")" = "$name" ] || problem "$manifest: name is not $name"
+    while IFS= read -r line; do
+      problem "$manifest: $line"
+    done < <(jq -r --argjson names "$names" '.dependencies[]?
+      | if type == "string" then (if test("@") then empty else . end)
+        elif (.marketplace? // null) == null then .name else empty end
+      | select(. as $d | ($names | any(.[]; . == $d)) | not)
+      | "dependency \(.) names no plugin in marketplace.json"' "$manifest" 2>&1)
+    version="$(jq -r '.version | strings' "$manifest")"
+    if [ -z "$version" ]; then
+      problem "$manifest: no version"
+      continue
+    fi
+    versions+=("$version")
+  done < <(jq -r '.plugins[] | [.name, (.source | tostring)] | @tsv' "$market")
+  [ "$n" -gt 0 ] || problem "$market lists no plugins"
+  version="${versions[0]:-}"
+  for v in ${versions[@]+"${versions[@]}"}; do
+    [ "$v" = "$version" ] || problem "plugin versions differ (${versions[*]}); the plugins release together"
+  done
+  [ -z "$version" ] || grep -q "^## \[$version\]" CHANGELOG.md || problem "CHANGELOG.md: no ## [$version] section"
+  finish manifests "$n marketplace entries checked against their plugin folders (name, source, dependencies, one shared version: ${version:-none}) and CHANGELOG.md"
+}
+
+check_plugin_limits() {
+  local dir f n size line counts=""
+  shopt -s nocasematch
+  while IFS= read -r dir; do
+    n=0
+    while IFS= read -r -d '' f; do
+      if [ ! -e "$f" ] && [ ! -L "$f" ]; then continue; fi
+      n=$((n + 1))
+      if [ -L "$f" ]; then
+        problem "$f: symlink"
+        continue
+      fi
+      if [ ! -f "$f" ]; then
+        problem "$f: not a regular file"
+        continue
+      fi
+      case "$f" in
+        *.png | *.jpg | *.jpeg | *.gif | *.webp | *.svg | *.ico | *.bmp | *.avif | \
+          *.woff | *.woff2 | *.ttf | *.otf | *.eot) continue ;;
+      esac
+      size=$(($(wc -c <"$f")))
+      [ "$size" -lt 262144 ] || problem "$f: $size bytes, and a file other than an image or font must be under 256 KiB"
+    done < <(files "$dir")
+    [ "$n" -gt 0 ] || problem "no files under $dir"
+    [ "$n" -le 512 ] || problem "$dir: $n files, and the limit is 512"
+    counts="$counts${counts:+, }$dir $n"
+    local hooks="$dir/hooks/hooks.json" manifest="$dir/.claude-plugin/plugin.json"
+    if [ -f "$hooks" ]; then
+      while IFS= read -r line; do
+        problem "$hooks: $line"
+      done < <(jq -r "$bad_commands" "$hooks" 2>&1)
+    fi
+    while IFS= read -r line; do
+      problem "$manifest: $line"
+    done < <(jq -r "$bad_paths" "$manifest" 2>&1)
+  done < <(plugin_dirs)
   shopt -u nocasematch
-  [ "$n" -gt 0 ] || problem "no files under plugins/sutra"
-  [ "$n" -le 512 ] || problem "plugins/sutra: $n files, and the limit is 512"
-  local bad_commands='
+  [ -n "$counts" ] || problem "marketplace.json lists no plugin folder"
+  finish plugin-limits "files per plugin (limit 512): $counts; file sizes, symlinks, hook commands and manifest paths checked"
+}
+
+# Commands in hooks.json may use only ${CLAUDE_PLUGIN_ROOT}; manifest paths stay inside the plugin.
+bad_commands='
     [.. | objects | .command? | strings][]
     | select(test("[.][.]")
         or (gsub("[$][{]CLAUDE_PLUGIN_ROOT[}]"; "ROOT")
             | test("[$`]|(^|[^A-Za-z0-9_.-])[/~]")))
     | "command holds .., an absolute path, or a variable or command substitution other than ${CLAUDE_PLUGIN_ROOT}: \(.)"'
-  local bad_paths='
+bad_paths='
     paths(strings) as $p
     | getpath($p)
     | select(test("^(/|~|[A-Za-z]:[\\\\/])") or test("(^|[\\\\/])\\.\\.([\\\\/]|$)"))
     | "\($p | map(tostring) | join(".")) is absolute or climbs with ..: \(.)"'
+
+# Anthropic's plugin directory refuses, from an organization that is not
+# Verified, any hook, workflow script, or file outside Markdown, text, JSON,
+# YAML, and PNG/JPEG/GIF/WebP/ICO images. plugins/sutra is the plugin submitted
+# there; everything that runs on its own lives in plugins/sutra-harness.
+check_directory_policy() {
+  local dir=plugins/sutra out scan line words f
+  scan='
+    use strict;
+    use warnings;
+    use Encode ();
+    my $dir = shift;
+    my %head = (
+      png => qr/\A\x89PNG\r\n\x1a\n/, jpg => qr/\A\xff\xd8\xff/, jpeg => qr/\A\xff\xd8\xff/,
+      gif => qr/\AGIF8[79]a/, webp => qr/\ARIFF.{4}WEBP/s, ico => qr/\A\x00\x00\x01\x00/,
+    );
+    my %tail = (png => qr/IEND\xaeB`\x82\z/, jpg => qr/\xff\xd9\z/, jpeg => qr/\xff\xd9\z/, gif => qr/\x3b\z/);
+    my $text = qr/\.(?:md|markdown|txt|json|ya?ml)\z|(?:\A|\/)(?:LICENSE|LICENCE|COPYING|NOTICE|README|\.gitignore)\z/i;
+    my $pm = qr/(?:\A|\/)(?:package(?:-lock)?\.json|npm-shrinkwrap\.json|pnpm-(?:workspace|lock)\.ya?ml|yarn\.lock|\.yarnrc(?:\.ya?ml)?|\.npmrc|bun\.lockb?|bunfig\.toml|deno\.(?:json|jsonc|lock)|composer\.(?:json|lock)|bower\.json|pubspec\.ya?ml|environment\.ya?ml|[^\/]*(?:requirements|constraints)[^\/]*\.txt|requirements\/[^\/]+\.txt|pipfile(?:\.lock)?|poetry\.lock|uv\.lock)\z/i;
+    my $runs = qr/\A(?:(?:hooks|workflows|bin|monitors)\/|(?:\.mcp|\.lsp|settings)\.json\z)/i;
+    my $device = qr/\A(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.[^.]*)?\z/i;
+    my ($count, %folded) = (0);
+    local $/ = "\0";
+    while (my $name = <STDIN>) {
+      chomp $name;
+      next if -l $name || !-f _;
+      my $size = -s _;
+      $count++;
+      (my $rel = $name) =~ s/\A\Q$dir\E\///;
+      for my $part (split /\//, $rel) {
+        print "$name: the name part \"$part\" holds a colon, ends in a dot or space, or is a reserved device name\n"
+          if $part =~ /:|[. ]\z/ || $part =~ $device;
+        print "$name: macOS archive metadata (__MACOSX)\n" if $part eq "__MACOSX";
+      }
+      print "$name: differs from $folded{lc $rel} only by case\n" if exists $folded{lc $rel};
+      $folded{lc $rel} = $name;
+      print "$name: a plugin path that runs code or declares a hook or server\n" if $rel =~ $runs;
+      print "$name: a package manager configuration file\n" if $rel =~ $pm;
+      print "$name: a skill file must be named SKILL.md exactly\n" if $rel =~ /\Askills\/[^\/]+\/skill\.md\z/i && $rel !~ /\/SKILL\.md\z/;
+      print "$name: $size bytes, and every file must be under 5 MiB\n" if $size >= 5 * 1024 * 1024;
+      open(my $fh, "<:raw", $name) or do { print "$name: cannot read: $!\n"; next };
+      my $data = do { local $/; <$fh> } // "";
+      close $fh;
+      my ($ext) = $rel =~ /\.([^.\/]+)\z/;
+      $ext = lc($ext // "");
+      if (exists $head{$ext}) {
+        print "$name: not a complete .$ext image\n"
+          unless $data =~ $head{$ext} && (!exists $tail{$ext} || $data =~ $tail{$ext});
+        next;
+      }
+      if ($rel !~ $text) {
+        print "$name: not Markdown, text, JSON, YAML, or a PNG, JPEG, GIF, WebP, or ICO image\n";
+        next;
+      }
+      print "$name: starts with #!\n" if $data =~ /\A(?:\xef\xbb\xbf)?#!/;
+      print "$name: holds a NUL byte\n" if index($data, "\0") >= 0;
+      my $copy = $data;
+      print "$name: not UTF-8\n" unless eval { Encode::decode("UTF-8", $copy, Encode::FB_CROAK()); 1 };
+      next unless $rel =~ /\.md\z/i;
+      if ($data =~ /\A(?:\xef\xbb\xbf)?---\r?\n(.*?)^---\r?$/ms) {
+        my $fm = $1;
+        while ($fm =~ /^(hooks|mcpServers)[ \t]*:/mg) {
+          print "$name: frontmatter declares $1, which runs code\n";
+        }
+      }
+      print "$name: runs a shell command when it loads (an inline !`...` or a ```! block)\n"
+        if $rel =~ /\A(?:skills\/[^\/]+\/SKILL|commands\/.+)\.md\z/i && ($data =~ /(?:^|\s)!`/m || $data =~ /^[ \t]*```!/m);
+    }
+    print "$count\n";
+  '
+  out="$(files "$dir" | perl -e "$scan" "$dir")" || problem "the file scan failed"
+  collect "$out"
   while IFS= read -r line; do
-    problem "$hooks: $line"
-  done < <(jq -r "$bad_commands" "$hooks" 2>&1)
-  while IFS= read -r line; do
-    problem "$manifest: $line"
-  done < <(jq -r "$bad_paths" "$manifest" 2>&1)
-  finish plugin-limits "$n files under plugins/sutra (limit 512); file sizes, symlinks, hook commands and manifest paths checked"
+    problem "$dir/.claude-plugin/plugin.json: $line"
+  done < <(jq -r '(keys_unsorted - ["$schema", "name", "displayName", "version", "description", "author", "homepage", "repository", "license", "keywords", "icon", "documentationUrl", "supportUrl", "privacyPolicyUrl", "termsOfServiceUrl", "skills", "agents", "outputStyles", "defaultEnabled", "dependencies", "metadata", "userConfig"])[]
+    | "key \(.) is outside the allowlist in check_directory_policy, which leaves out every key that can run code"' "$dir/.claude-plugin/plugin.json" 2>&1)
+  for f in README.md LICENSE; do
+    regular "$dir/$f" || problem "$dir/$f is missing"
+  done
+  words="$(perl -0777 -ne 's/^[ \t]*```.*?^[ \t]*```[^\n]*$//msg; my @w = split; print scalar @w' "$dir/README.md" 2>/dev/null)"
+  [ "${words:-0}" -ge 40 ] || problem "$dir/README.md: ${words:-0} words outside code blocks, and the directory wants at least 40"
+  while IFS= read -r -d '' f; do
+    grep -Eq '(^|[[:space:]])(export-ignore|export-subst|filter=)' "$f" &&
+      problem "$f: export-ignore, export-subst, or filter changes the files the directory fetches"
+  done < <(files .gitattributes '*/.gitattributes')
+  finish directory-policy "$count files under $dir: allowed types and names only, complete images, every file under 5 MiB, UTF-8 text without NUL or #!, no hook, workflow, server, shell injection, or package manager file; manifest keys allowlisted; README (40 words outside code) and LICENSE present"
 }
 
 check_workflows() {
@@ -339,9 +478,9 @@ check_workflows() {
     }
     console.log(count);
   '
-  out="$(files ':(glob)plugins/sutra/workflows/*.js' | node -e "$parse")" || problem "node failed"
+  out="$(files ':(glob)plugins/sutra-harness/workflows/*.js' | node -e "$parse")" || problem "node failed"
   collect "$out"
-  finish workflows "plugins/sutra/workflows/*.js ($count) compiled inside an async function, each led by a plain-literal export const meta (node $version)"
+  finish workflows "plugins/sutra-harness/workflows/*.js ($count) compiled inside an async function, each led by a plain-literal export const meta (node $version)"
 }
 
 check_hook_tests() { # check_hook_tests SHELL
@@ -360,7 +499,9 @@ check_yaml
 check_bash_syntax
 check_shellcheck
 check_frontmatter
+check_manifests
 check_plugin_limits
+check_directory_policy
 check_workflows
 check_hook_tests bash
 # macOS ships bash 3.2 as /bin/bash, and the hook must run under it.

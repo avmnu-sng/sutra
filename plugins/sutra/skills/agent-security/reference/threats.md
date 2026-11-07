@@ -51,7 +51,8 @@ refer to the procedure in [../SKILL.md](../SKILL.md).
   invisible characters in the rule files of Cursor and GitHub Copilot. Any
   instruction file an agent loads works the same way.
 - **Mitigation:** audit rule files, review them with the scrutiny given to
-  executable code, and detect hidden characters. Sutra scans instruction files
+  executable code, and detect hidden characters with the section 3 scan. With
+  `sutra-harness` installed, its security floor also scans instruction files
   at session start. Sections 3, 7.
 - **Source:** Pillar Security,
   https://www.pillar.security/blog/new-vulnerability-in-github-copilot-and-cursor-how-hackers-can-weaponize-code-agents
@@ -63,8 +64,8 @@ refer to the procedure in [../SKILL.md](../SKILL.md).
 - **Vector:** a reviewer approves what the editor shows, and the compiler
   builds what the file stores.
 - **Mitigation:** flag bidirectional controls in source and review the stored
-  characters. Sutra reports them in files Claude writes or opens with Read.
-  Section 3.
+  characters. With `sutra-harness` installed, its security floor reports them
+  in files Claude writes or opens with Read. Section 3.
 - **Source:** https://trojansource.codes/
 
 ## Unicode tag characters
@@ -74,7 +75,8 @@ refer to the procedure in [../SKILL.md](../SKILL.md).
   receive text a reviewer cannot see.
 - **Vector:** any text the agent reads: a file, an issue, a web page, or a
   tool description.
-- **Mitigation:** sutra reports tag characters in files; decode a hit by
+- **Mitigation:** the section 3 scan finds tag characters in files, and with
+  `sutra-harness` installed its security floor reports them; decode a hit by
   subtracting 0xE0000 from each code point. Section 3.
 - **Source:** the Unicode Tags chart,
   https://www.unicode.org/charts/PDF/UE0000.pdf
@@ -127,7 +129,7 @@ Agentic Applications
 
 | OWASP risk | Sutra control | Skill section |
 | --- | --- | --- |
-| LLM01 Prompt Injection | Untrusted-content card after the first WebFetch or WebSearch; hidden-Unicode warnings on files Claude writes or opens with Read, and on instruction files at session start | 1, 2, 3 |
+| LLM01 Prompt Injection | Untrusted input treated as data, and the section 3 scan for hidden characters. With `sutra-harness`: the untrusted-content card after the first WebFetch or WebSearch, and hidden-Unicode warnings on files Claude writes or opens with Read and on instruction files at session start | 1, 2, 3 |
 | LLM03 Supply Chain | The vetting procedure for plugins, MCP servers, and skills; `/sutra:security-hygiene` for dependencies | 4, 7 |
 | LLM06 Excessive Agency | Read-only subagents limited to Read, Grep, and Glob; deny rules, the sandbox, and scoped tokens | 1, 5, 6 |
 

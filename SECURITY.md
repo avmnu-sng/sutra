@@ -36,16 +36,20 @@ Include what you can of:
 
 ## Scope
 
+Sutra is two plugins: `sutra` (skills and subagents) and `sutra-harness`
+(hooks, contract, cards, and the workflow). Both are in scope.
+
 In scope:
 
-- **The hook dispatcher**, `plugins/sutra/hooks/sutra.sh`, and its wiring in
-  `plugins/sutra/hooks/hooks.json`. For example: running a command, reaching
-  the network, or writing outside the plugin data directory through a crafted
-  payload, file, or file name; a repository lowering the profile or turning
-  off the security floor through `.sutra`; text breaking out of the hook's
-  JSON output; or a character in the documented set that the scan misses.
+- **The hook dispatcher**, `plugins/sutra-harness/hooks/sutra.sh`, and its
+  wiring in `plugins/sutra-harness/hooks/hooks.json`. For example: running a
+  command, reaching the network, or writing outside the plugin data directory
+  through a crafted payload, file, or file name; a repository lowering the
+  profile or turning off the security floor through `.sutra`; text breaking
+  out of the hook's JSON output; or a character in the documented set that
+  the scan misses.
 - **The bundled workflow**,
-  `plugins/sutra/workflows/build-orchestrator.workflow.js`.
+  `plugins/sutra-harness/workflows/build-orchestrator.workflow.js`.
 - **The examples** in `examples/`, where copying one as documented weakens a
   user's security.
 - **CI**, the workflows in `.github/workflows/`.

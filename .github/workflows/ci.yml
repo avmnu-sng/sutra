@@ -70,5 +70,12 @@ jobs:
       - name: Validate the marketplace
         run: claude plugin validate --strict .
 
-      - name: Validate the plugin against the directory profile
+      - name: Validate each plugin
+        run: |
+          claude plugin validate --strict plugins/sutra
+          claude plugin validate --strict plugins/sutra-harness
+
+      # plugins/sutra is the plugin submitted to Anthropic's plugin directory;
+      # sutra-harness ships hooks, which the directory refuses from this org.
+      - name: Validate the skills plugin against the directory profile
         run: claude plugin validate --strict --profile directory plugins/sutra

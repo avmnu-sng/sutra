@@ -7,6 +7,18 @@ guard, the choice of jq or `JSON::PP`, `json_get`, `reply`) and replace steps
 a JSON template. Runnable, tunable templates live in `examples/hooks/` in the
 sutra repository; adapt any of these to your stack before relying on it.
 
+## Wiring
+
+In a plugin's `hooks/hooks.json`, quote the plugin-root variable so a path
+with spaces holds together, and set a timeout:
+
+```json
+{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/check.sh", "timeout": 10 }
+```
+
+In project settings, use `"\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check.sh"`
+the same way.
+
 ## A. Fail-open guard wrapper
 
 The skeleton in `SKILL.md` section 2 *is* this recipe: parse, early-return
@@ -124,8 +136,8 @@ with `permissionDecision` `deny`.
 
 Compute ahead/behind versus the upstream ref as of the last fetch, and give
 Claude the result as context. Do not fetch from a hook: a network call on
-every session start runs with the user's git credentials, adds latency, and
-fails offline. Report the cached state and leave fetching to an explicit step.
+every session start acts without a prompt, adds latency, and fails offline.
+Report the cached state and leave fetching to an explicit step.
 A `SessionStart` hook cannot gate a session, and this one never tries:
 detached HEAD and no upstream both fall through to `exit 0`.
 

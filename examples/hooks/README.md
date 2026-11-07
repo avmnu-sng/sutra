@@ -1,8 +1,8 @@
 # Opt-in hooks
 
-These hooks are **off by default** and are **not part of the sutra plugin**.
-Nothing here runs until you wire it into your own settings or git hooks, so
-the plugin never imposes a gate you did not ask for.
+These hooks are **off by default** and are **not part of either Sutra
+plugin**. Nothing here runs until you wire it into your own settings or git
+hooks, so neither plugin imposes a gate you did not ask for.
 
 Treat every script as a starting template, not a finished tool. The checks
 are deliberately coarse and language-agnostic; adapt them to your stack

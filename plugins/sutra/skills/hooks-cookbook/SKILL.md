@@ -75,13 +75,13 @@ fi
 json_get() {
   if [ "$json" = jq ]; then
     printf '%s' "$payload" |
-      jq -r --arg p "$1" 'getpath($p | split("."))? | scalars | values' 2>/dev/null
+      jq -r --arg p "${1}" 'getpath($p | split("."))? | scalars | values' 2>/dev/null
   else
     printf '%s' "$payload" | perl -MJSON::PP -e '
       my $v = eval { JSON::PP->new->utf8->decode(do { local $/; <STDIN> }) };
       $v = ref $v eq "HASH" ? $v->{$_} : undef for split /\./, $ARGV[0];
       $v = $v ? "true" : "false" if JSON::PP::is_bool($v);
-      if (defined $v && !ref $v) { utf8::encode($v); print $v }' -- "$1" 2>/dev/null
+      if (defined $v && !ref $v) { utf8::encode($v); print $v }' -- "${1}" 2>/dev/null
   fi
 }
 
@@ -174,26 +174,27 @@ Each recipe replaces steps 2-5 of the skeleton; the code is in
 Enforcement belongs to the user, not the plugin: a hook that fires unasked,
 even one that only warns at the wrong moment, is a surprise.
 
-- **What sutra ships.** Advisory hooks (the session-start contract, rule
-  cards, hidden-Unicode warnings, a compaction brief) plus, under the
-  `strict` profile only, one bounded verify-before-stop nudge: a `Stop` hook
-  that asks Claude once to run the project's checks when code changed and no
-  check ran since. It never fires while `stop_hook_active` is true, never
-  twice for the same edits, never when Claude ends on a question, and
-  `SUTRA_GATE=off` turns it off. Sutra never blocks a tool call and makes no
-  network calls.
+- **What sutra-harness ships.** The companion plugin's hooks are advisory
+  (the session-start contract, rule cards, hidden-Unicode warnings, a
+  compaction brief) plus, under the `strict` profile only, one bounded
+  verify-before-stop nudge: a `Stop` hook that asks Claude once to run the
+  project's checks when code changed and no check ran since. It never fires
+  while `stop_hook_active` is true, never twice for the same edits, never when
+  Claude ends on a question, and `SUTRA_GATE=off` turns it off. It never
+  blocks a tool call and makes no network calls. This plugin, `sutra`, ships
+  no hooks.
 - **Blocking or mutating hooks are opt-in.** The user wires them in their own
   `settings.json`, or the hook does nothing unless a switch the user sets
   turns it on.
-- **Quote the path and set a timeout.** Shell form quotes the placeholder:
-  `"command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/check.sh"` in a plugin, or
-  `"\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check.sh"` in project settings,
-  with `"timeout": 10`. The default is 600 seconds (30 on
-  `UserPromptSubmit`), and a hung hook holds the session that long.
-- **No network calls with the user's credentials.** A hook runs unattended
-  on every matching event: a fetch, push, or API call would spend the user's
-  credentials without a prompt, add latency, and fail offline. Read local or
-  cached state, as recipe E reads the last fetch.
+- **Quote the path and set a timeout.** Shell form quotes the path
+  variable: `"\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check.sh"` in project
+  settings, and the plugin-root variable the same way in a plugin (the exact
+  line is under Wiring in [reference/recipes.md](reference/recipes.md)), with
+  `"timeout": 10`. The default is 600 seconds (30 on `UserPromptSubmit`), and
+  a hung hook holds the session that long.
+- **No network calls.** A hook runs unattended on every matching event: a
+  fetch, push, or API call would act without a prompt, add latency, and fail
+  offline. Read local or cached state, as recipe E reads the last fetch.
 - **One wiring per script.** Never register the same script as both a git
   `pre-commit` and a Claude Code hook; it would run twice.
 - **Templates.** `examples/hooks/` in the sutra repository
