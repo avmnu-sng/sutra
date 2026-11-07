@@ -9,18 +9,20 @@ project, or a **plugin** distributed through a marketplace. Only the plugin
 path gives you install-once, no-clone, versioned, auto-updating distribution.
 So Sutra is a plugin.
 
-But a plugin cannot ship two things people often want to share: a `CLAUDE.md`
-(there is no "inject this memory" plugin field) and a saved Workflow. Sutra
-works around both:
+But a plugin cannot ship a `CLAUDE.md` (there is no "inject this memory"
+plugin field). Sutra works around that, and ships its workflow natively:
 
 - **Always-on operating contract** is delivered by a `SessionStart` **hook**
   whose stdout Claude Code adds to the session context. This is the same
   mechanism a user-level memory-loader hook uses, applied from inside a plugin.
   No `CLAUDE.md` edit required.
-- **Workflows** ship as plain files under `plugins/sutra/workflows/` (inside
-  the plugin, so `${CLAUDE_PLUGIN_ROOT}` reaches them after install). A skill
-  (`/sutra:scaffold-execution-plan`) copies the orchestrator into a target
-  project's `.claude/workflows/` on request.
+- **Workflows** need no workaround: a plugin ships them natively. Claude Code
+  loads every script in the plugin's `workflows/` directory and namespaces it
+  by plugin name, so the orchestrator whose `meta.name` is
+  `build-orchestrator` runs as `/sutra:build-orchestrator`. `meta` must be the
+  first statement and a plain object literal (no variables, function calls,
+  spreads, or string concatenation), or Claude Code drops the command from `/`
+  autocomplete.
 
 ## One plugin, layered profiles
 
@@ -59,7 +61,7 @@ belongs in a pre-commit check or CI that the project owns.
 
 ## Harness
 
-All runtime behavior is one Bash script, `hooks/sutra.sh`, which
+All hook behavior is one Bash script, `hooks/sutra.sh`, which
 `hooks/hooks.json` runs with one argument per event and a 5 to 10 second
 timeout. Context for Claude goes out as `additionalContext`, notices for the
 user as `systemMessage`.
@@ -121,7 +123,7 @@ sutra/
     assets/icon.png                   # the listing icon
     hooks/
       hooks.json                      # wires five events to sutra.sh
-      sutra.sh                        # the hook dispatcher (all runtime code)
+      sutra.sh                        # the hook dispatcher (all hook code)
     profiles/                         # contract layers, composed per profile
       core.md                         # carried by every profile except off
       standard.md                     # added under standard and strict
@@ -129,7 +131,7 @@ sutra/
     cards/<id>.md                     # rule cards (+ <id>.strict.md add-ons)
     skills/<name>/SKILL.md            # invocable methodologies (/sutra:<name>)
     agents/<name>.md                  # dispatchable subagents (thin dispatchers)
-    workflows/                        # distributable orchestration scripts
+    workflows/<name>.workflow.js      # workflows, run as /sutra:<meta.name>
   tests/hooks.sh                      # behavior tests for sutra.sh
   docs/                               # install guide, profile guide, architect persona
   examples/                           # sample CLAUDE.md, AGENTS.md, settings, opt-in hooks

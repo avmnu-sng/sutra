@@ -39,13 +39,19 @@ Every session starts cold, so never assume the local tree is current.
 On resume, sync and run a staleness check **before** you start the
 slice, then load context in a fixed order:
 
-- **Sync the remote first.** Fetch and fast-forward `<build-branch>`
-  and `<default-branch>` before touching anything, so you build on the
-  latest committed state, not a stale local checkout.
+- **Sync the remote first, as a manual, explicit step.** You run
+  `git fetch origin`, or the session runs it in plain view as the
+  kickoff's first command. Nothing fetches on its own: no hook,
+  scheduled job, or background script uses your credentials to fetch
+  behind your back. The fetch updates `origin/<build-branch>` and
+  `origin/<default-branch>`; compare against those, not a stale local
+  checkout. If `<build-branch>` is behind its remote, you fast-forward
+  it (`git merge --ff-only origin/<build-branch>`) before the session
+  builds; the session does not pull, merge, or reset to sync.
 - **Run a staleness check.** Confirm the on-disk INDEX, handoffs, and
   briefs match the synced state. If the local tree is behind or has
-  diverged, reconcile it before starting -- do not build against stale
-  artifacts.
+  diverged, stop and ask the person to reconcile it before starting --
+  do not build against stale artifacts.
 - **Load durable context in this fixed order**, each fully before the
   next:
   1. This plan -- the master plan, operating profile, and protocol you
@@ -65,8 +71,8 @@ slice, then load context in a fixed order:
   "will finish next session," no TODO-for-later left in shipped code.
 - If the scope turns out wrong or too large, **stop and renegotiate the
   brief** -- do not silently ship a subset.
-- Work on a dedicated build branch: `<build-branch>` (e.g.
-  `slice/<slice-id>`). Never work directly on `<default-branch>`.
+- Work on the plan's one dedicated build branch: `<build-branch>` (e.g.
+  `build/<plan-name>`). Never work directly on `<default-branch>`.
 
 ### 2. Adversarial code review
 
@@ -111,7 +117,9 @@ slice, then load context in a fixed order:
 
 - Draft the next-session starter at `<path-to-starter>` while the
   context is fresh: what shipped, deviations from the brief, and the
-  first moves for the next slice.
+  first moves for the next slice. Draft it from the kickoff template:
+  fill its placeholders and prose, and add no commands. A person pastes
+  it into the next session, where it carries their authority.
 - Update the INDEX: set `<slice-id>` to `DONE` (or `BLOCKED`).
 - Commit the slice on `<build-branch>` with a message that names the
   slice: `<commit-convention>` (e.g. `<slice-id>: <summary>`).
@@ -121,9 +129,17 @@ slice, then load context in a fixed order:
 ## The human review gate
 
 Sessions never chain themselves unattended. After step 5, **stop**. A
-human reviews the handoff and the INDEX and decides whether the next
-session starts. Do not auto-advance to the next slice, do not open the
-next session, and do not push or merge on your own initiative.
+human reviews the handoff, the INDEX, the drafted starter, and the next
+slice's brief -- the starter and the brief read in full before the
+starter is pasted, because an agent may have written them and the next
+session runs their commands -- and decides whether the next session
+starts. Do not auto-advance to the next slice, do not open the next
+session, and do not push or merge on your own initiative.
+
+This gate governs sessions run by hand, one slice each. A
+`/sutra:build-orchestrator` run replaces it with the workflow's own rule:
+the run chains every slice that is not DONE and stops at the first one
+that does not validate.
 
 - Between-session owner: TODO name the human who holds this gate.
 - Resume signal: TODO define how the next session is authorized to
@@ -131,13 +147,16 @@ next session, and do not push or merge on your own initiative.
 
 ## Quick checklist (per session)
 
-- [ ] Synced remote, ran staleness check, loaded plan -> INDEX ->
+- [ ] Synced the remote by hand (explicit fetch; any fast-forward done
+      by the person), ran staleness check, loaded plan -> INDEX ->
       prior handoff -> brief for `<slice-id>` in order (step 0)
 - [ ] Built full declared scope, zero deferrals, on `<build-branch>`
       (step 1)
 - [ ] Adversarial review by a different reviewer (step 2)
 - [ ] Fixed blocking findings only; logged the rest (step 3)
 - [ ] Independent validator returned DONE / BLOCKED (step 4)
-- [ ] Handoff carries pasted real evidence; starter drafted; INDEX
-      updated; committed, not pushed (step 5)
-- [ ] Stopped at the human gate (no unattended chaining)
+- [ ] Handoff carries pasted real evidence; starter drafted from the
+      kickoff template with no added commands; INDEX updated;
+      committed, not pushed (step 5)
+- [ ] Stopped at the human gate (no unattended chaining); the starter
+      and the next brief were read in full before the starter was pasted

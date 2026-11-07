@@ -99,7 +99,8 @@ environment:
   - `multi-session-build` -- gates that keep a long, multi-session build honest
     (claims-vs-built ledger, topology slice, independent completeness gate).
   - `scaffold-execution-plan` -- lay down an `execution_plan/` tree (from ready
-    templates) and a resumable build-orchestrator workflow for a large effort.
+    templates) for a large effort, for the `/sutra:build-orchestrator`
+    workflow to drive.
   - `scrub-before-publish` -- before open-sourcing your own code or docs, remove
     secrets and internal identifiers, and verify with a repeated search.
   - `commit-craft` -- write commit messages a future `git blame` reader will
@@ -147,13 +148,16 @@ environment:
   - briefs the compaction summary on what to keep;
   - under `strict`, asks Claude once to run the project's checks if it changed
     code and ran none since.
-- **Workflows** (`plugins/sutra/workflows/`) -- distributable orchestration
-  scripts, including a resumable multi-session build orchestrator. See
-  `plugins/sutra/workflows/README.md`.
+- **Workflows** (`plugins/sutra/workflows/`) -- the resumable multi-session
+  build orchestrator, a native plugin workflow you run as
+  `/sutra:build-orchestrator`. See
+  [`plugins/sutra/workflows/README.md`](plugins/sutra/workflows/README.md).
 - **Docs** (`docs/`) -- a quickstart, an install guide, the profile guide
   (layers, cards and their triggers, and the rule-to-layer mapping), a skills
-  catalog (`docs/skills.md`) for picking between overlapping skills, a release
-  runbook, and the long-form architect persona.
+  catalog (`docs/skills.md`) for picking between overlapping skills, the
+  threat model and hardening guide (`docs/security.md`), a release runbook,
+  and the long-form architect persona. `SECURITY.md` says how to report a
+  vulnerability.
 - **Examples** (`examples/`) -- a project `CLAUDE.md`, an `AGENTS.md` working
   agreement, a conservative scoped-permission `settings.json`, a machine-readable
   `setup.yaml` agent-bootstrap manifest, and opt-in (off-by-default)
@@ -190,27 +194,33 @@ five events: SessionStart, UserPromptSubmit, PostToolUse, PreCompact, and Stop.
 - **Reads:** the hook payload on standard input; `SUTRA_PROFILE`,
   `SUTRA_SECURITY`, `SUTRA_GATE`, and the plugin's `profile` setting; the
   project's `.sutra` (first 64 bytes, symbolic links ignored); the profiles and
-  cards bundled with the plugin; the instruction files the project loads, at
-  session start; and each file Claude writes or reads, up to 4 MiB, to look for
-  hidden Unicode.
+  cards bundled with the plugin; a fixed set of agent instruction files
+  (`CLAUDE.md`, `AGENTS.md`, and others), at session start; and each file
+  Claude writes or reads, up to 4 MiB, to look for hidden Unicode.
 - **Writes:** standard output (context for Claude, notices for you) and small
   per-session marker files under the plugin data directory Claude Code provides
   (`CLAUDE_PLUGIN_DATA`), pruned after 14 days.
 - **Never:** network calls, seeking out or sending credentials, blocking a
   tool call, editing your files, or changing settings. A file Claude has just
-  read is scanned in place; only a line number and code point leave the
-  script. The one request it makes: under `strict`, it may ask Claude once per
-  batch of edits to run the project's checks before it stops. The four
-  subagents are limited to Read, Grep, and Glob.
+  read is scanned in place; only its name, a line number, and a code point
+  leave the script. The one request it makes: under `strict`, it may ask
+  Claude once per batch of edits to run the project's checks before it stops.
+  The four subagents are limited to Read, Grep, and Glob.
 - **Review before you install:** read the two hook files, or clone this
   repository and run `claude --plugin-dir ./plugins/sutra plugin details sutra`
-  to list every component and its context cost.
+  to list its skills, agents, and hooks and their context cost. That list
+  leaves out the workflow script,
+  `plugins/sutra/workflows/build-orchestrator.workflow.js`; read it before you
+  run it.
 - **Turn parts off:** `SUTRA_PROFILE=off` drops the contract, cards, and stop
   gate; `SUTRA_GATE=off` drops only the stop gate; `SUTRA_SECURITY=off`
   silences the security floor.
 
 The plugin's own [`README.md`](plugins/sutra/README.md) is the full disclosure
-of what runs and what it touches.
+of what runs and what it touches. [`docs/security.md`](docs/security.md) is the
+threat model: assets, trust boundaries, residual risk, an OWASP mapping, and a
+hardening guide. To report a vulnerability, follow [`SECURITY.md`](SECURITY.md):
+use GitHub's private vulnerability reporting, not a public issue.
 
 ## Compatibility
 

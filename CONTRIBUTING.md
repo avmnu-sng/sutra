@@ -10,8 +10,8 @@ and honest are welcome.
   file -- not in examples, not in commit messages. Use neutral, invented
   examples.
 - **ASCII only.** No non-ASCII bytes in any file. Write `--` for an em dash,
-  `->` for an arrow, straight quotes. Verify with `file <path>` reporting
-  `ASCII text`.
+  `->` for an arrow, straight quotes. Verify with `bash scripts/check.sh`,
+  which scans every tracked file's bytes.
 - **Never block a tool call; degrade to silence.** Sutra never blocks a tool
   call. Under `strict` it may ask the agent, at most once per batch of edits,
   to run the project's checks before it stops. Every hook degrades to silence
@@ -41,23 +41,46 @@ and honest are welcome.
 ## Validate before opening a PR
 
 ```
-bash tests/hooks.sh
-BASH_UNDER_TEST=/bin/bash bash tests/hooks.sh
+bash scripts/check.sh
 claude plugin validate --strict .
 claude plugin validate --strict --profile directory ./plugins/sutra
-find . -type f ! -path './.git/*' -exec file {} \; | grep -v 'ASCII text' || echo "all ASCII"
 ```
 
-`tests/hooks.sh` runs `plugins/sutra/hooks/sutra.sh` through its behavior
-cases in a clean environment and needs `jq`; the second line runs it under
-macOS bash 3.2. `--strict` fails on warnings, and `--profile directory` adds
-the subset of the plugin directory's checks the CLI can run (README, license,
-icon). The directory's portal runs more checks, plus a security scan, after
-you push.
+`scripts/check.sh` runs the same checks as CI's `checks` job and prints one
+line per check:
 
-CI (`.github/workflows/ci.yml`) runs the ASCII, JSON/YAML, shell-syntax, and
-frontmatter checks on every push and pull request. Run `tests/hooks.sh` and
-`claude plugin validate` locally before opening a PR.
+- **ascii:** no NUL or non-ASCII byte, and no control byte other than tab,
+  LF, and CR before LF, in any file except the two allowlisted binaries,
+  `docs/demo.gif` and `plugins/sutra/assets/icon.png`.
+- **json**, **yaml:** every JSON file parses with `jq`, and every YAML file
+  with Python's PyYAML.
+- **bash-syntax**, **shellcheck:** `bash -n` and `shellcheck -S warning` on
+  every `*.sh` file.
+- **frontmatter:** inside its `---` block, every skill declares a
+  `description`, and every agent a `name` and a `description`.
+- **plugin-limits:** the plugin directory's folder limits for
+  `plugins/sutra`: at most 512 files, every file other than an image or font
+  under 256 KiB, no symlinks, no `..` or absolute path in a `plugin.json`
+  path, and no `..`, absolute path, command substitution, or variable other
+  than a braced `${CLAUDE_PLUGIN_ROOT}` in a `hooks.json` command.
+- **hook-tests:** `tests/hooks.sh`, which runs
+  `plugins/sutra/hooks/sutra.sh` through its behavior cases in a clean
+  environment, and runs them again under `/bin/bash` when that is a different
+  bash from the one on your `PATH`, so macOS bash 3.2 is always covered.
+
+It checks tracked files plus untracked files git does not ignore, so a new
+file is checked before you stage it. It needs `git`, `jq`, and `perl`.
+Without `shellcheck`, or `python3` with PyYAML, it prints a `skip` line for
+that check; CI sets `CI=true`, which turns a skip into a failure. While
+working on the hook, `bash tests/hooks.sh` runs the behavior cases alone.
+
+`--strict` fails on warnings, and `--profile directory` adds the subset of the
+plugin directory's checks the CLI can run (README, license, icon). The
+directory's portal runs more checks, plus a security scan, after you push.
+
+CI (`.github/workflows/ci.yml`) runs `scripts/check.sh` and both
+`claude plugin validate` commands, with Claude Code pinned to one version, on
+every push to `main` and every pull request.
 
 ## Commits and branches
 

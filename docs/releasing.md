@@ -48,20 +48,24 @@ before the version bump so you never tag a broken tree.
    holds every entry for this release (Added / Changed / Fixed as needed).
    Nothing ships that is not written down here.
 
-2. **Validate locally and confirm CI is green.** Run both:
+2. **Validate locally and confirm CI is green.** Run all three:
 
    ```
+   bash scripts/check.sh
    claude plugin validate --strict .
    claude plugin validate --strict --profile directory ./plugins/sutra
    ```
 
-   Both must report nothing: `--strict` fails on warnings, and
-   `--profile directory` runs the subset of the plugin directory's checks the
-   CLI can see. Run them before the version bump so you never tag a manifest
-   that fails validation. Then confirm
-   `.github/workflows/ci.yml` is green on the exact
-   SHA you are about to tag (ASCII-only, JSON/YAML validity, shell syntax,
-   skill/agent frontmatter). Green on "a recent run" is not green on this SHA.
+   All three must pass. `scripts/check.sh` runs the same checks as CI's
+   `checks` job (ASCII, JSON and YAML parsing, shell syntax and shellcheck,
+   skill and agent frontmatter, the plugin folder limits, and
+   `tests/hooks.sh`) and exits non-zero on any failure. `--strict` fails on
+   warnings, and `--profile directory` runs the subset of the plugin
+   directory's checks the CLI can see. Run them before the version bump so
+   you never tag a tree that fails them. Then confirm
+   `.github/workflows/ci.yml` is green on the exact SHA you are about to tag,
+   in both of its jobs, `checks` and `plugin-validate`. Green on "a recent
+   run" is not green on this SHA.
 
 3. **Bump the version.** Edit `plugins/sutra/.claude-plugin/plugin.json`
    `"version"` to `X.Y.Z`, chosen per the rules above. This is the change

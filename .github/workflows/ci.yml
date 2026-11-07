@@ -1,60 +1,60 @@
 name: ci
 
-# Dogfooding gate: the guardrails Sutra preaches, enforced on Sutra itself.
-# Self-contained structural checks -- no secrets. Run `claude plugin validate`
-# locally (a schema check; see CONTRIBUTING.md); CI covers the rest.
-
 on:
   push:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
-      - name: Files are ASCII-only
+      - name: Install shellcheck and PyYAML if missing
         run: |
-          if LC_ALL=C grep -rlIP '[^\x00-\x7F]' --exclude-dir=.git . ; then
-            echo "Non-ASCII bytes found in the text files listed above."; exit 1
+          if ! command -v shellcheck >/dev/null 2>&1 || ! python3 -I -c 'import yaml' >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends shellcheck python3-yaml
           fi
-          echo "All text files are ASCII (binary files skipped)."
 
-      - name: JSON manifests are valid
-        run: |
-          for f in .claude-plugin/marketplace.json \
-                   plugins/sutra/.claude-plugin/plugin.json \
-                   plugins/sutra/hooks/hooks.json \
-                   examples/settings.json; do
-            jq -e . "$f" >/dev/null || { echo "Invalid JSON: $f"; exit 1; }
-          done
-          echo "All JSON valid."
+      - name: Run scripts/check.sh
+        run: bash scripts/check.sh
 
-      - name: YAML examples parse
-        run: |
-          python3 -c "import yaml, glob
-          for f in glob.glob('examples/**/*.yaml', recursive=True):
-              yaml.safe_load(open(f)); print('ok', f)"
+  # claude plugin validate needs no login, so this job needs no secret.
+  plugin-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Dependabot bumps only the actions, so bump this by hand, and raise
+      # the Node floor in "Install Claude Code" if its engines.node rises.
+      CLAUDE_CODE_VERSION: "2.1.319"
+      DISABLE_AUTOUPDATER: "1"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
 
-      - name: Hook scripts have valid shell syntax
+      - name: Install Claude Code
         run: |
-          for s in $(find . -name '*.sh' -not -path './.git/*'); do
-            bash -n "$s" || { echo "Syntax error: $s"; exit 1; }
-          done
-          echo "All shell scripts parse."
+          node --version
+          node -e 'process.exit(parseInt(process.versions.node, 10) >= 22 ? 0 : 1)' || { echo "Claude Code $CLAUDE_CODE_VERSION needs Node 22 or newer"; exit 1; }
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/claude" "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+          echo "$RUNNER_TEMP/claude/node_modules/.bin" >> "$GITHUB_PATH"
 
-      - name: Skills and agents declare frontmatter
+      - name: Confirm the pinned CLI version
         run: |
-          fail=0
-          for f in plugins/sutra/skills/*/SKILL.md; do
-            head -1 "$f" | grep -q '^---$' || { echo "Missing frontmatter: $f"; fail=1; }
-            grep -q '^description:' "$f" || { echo "Missing description: $f"; fail=1; }
-          done
-          for f in plugins/sutra/agents/*.md; do
-            head -1 "$f" | grep -q '^---$' || { echo "Missing frontmatter: $f"; fail=1; }
-            grep -q '^name:' "$f" || { echo "Missing name: $f"; fail=1; }
-            grep -q '^description:' "$f" || { echo "Missing description: $f"; fail=1; }
-          done
-          [ "$fail" -eq 0 ] && echo "All skills and agents have frontmatter." || exit 1
+          claude --version
+          [ "$(claude --version | cut -d ' ' -f 1)" = "$CLAUDE_CODE_VERSION" ]
+
+      - name: Validate the marketplace
+        run: claude plugin validate --strict .
+
+      - name: Validate the plugin against the directory profile
+        run: claude plugin validate --strict --profile directory plugins/sutra

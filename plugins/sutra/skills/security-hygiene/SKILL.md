@@ -1,5 +1,5 @@
 ---
-description: Use when adding or upgrading a dependency, reviewing a lockfile diff, handling a security advisory, provisioning tokens or secrets, or vetting supply-chain risk -- the standing-liability angles that a diff-level vuln scan does not cover.
+description: Use when adding or upgrading a package dependency, reviewing a lockfile diff, handling a security advisory, provisioning tokens or secrets, or vetting supply-chain risk -- the standing-liability angles that a diff-level vuln scan does not cover.
 ---
 
 # Security hygiene
@@ -19,6 +19,14 @@ Security work sits at the T3 verification floor (see `/sutra:effort-calibration`
 stakes force the full floor no matter how small the change looks. Adding one
 line to a manifest is a one-line diff and a T3 decision. Do not let diff size
 talk you out of the floor.
+
+## The agent surface: /sutra:agent-security
+
+Plugins, MCP servers, and skills; prompt injection through content an agent
+reads; and Claude Code permissions and the sandbox make up the agent surface,
+and `/sutra:agent-security` covers it. Vet a plugin, MCP server, or skill there
+before you install it. This skill covers the packages, lockfiles, credentials,
+and advisories around your code, and does not repeat that material.
 
 ## 1. Vet a dependency BEFORE you add it
 
@@ -145,3 +153,5 @@ These signals mean stop and investigate before installing or building:
   of change size.
 - `/sutra:scrub-before-publish` is where the pre-publication secret scrub lives
   before code or docs leave your machine.
+- `/sutra:agent-security` owns the agent surface; this skill owns the packages
+  and credentials around your code.

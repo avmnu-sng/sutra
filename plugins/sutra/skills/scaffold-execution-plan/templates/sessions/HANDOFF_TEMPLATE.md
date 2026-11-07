@@ -15,7 +15,7 @@
 ## Branch catalog
 
 One row per branch this session touched, so the handoff doubles as branch tracking.
-Keep the primary slice branch first; add rows for any spin-off or dependency branches.
+Keep the build branch first; add rows for any spin-off or dependency branches.
 
 | id | branch | sha | base | status |
 | --- | --- | --- | --- | --- |

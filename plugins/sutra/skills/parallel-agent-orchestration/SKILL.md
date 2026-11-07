@@ -190,11 +190,29 @@ Before fanning out, confirm:
 
 ## Executable primitive
 
-The `build-orchestrator` workflow is a worked reference for this control flow.
-As shipped it runs every stage in ONE shared working tree on the current build
-branch -- the simple case. To parallelize slices without collisions, add the
-adaptation its header documents: give the build, fix, and retro stages an
-`isolation: "worktree"` option so each agent runs in its own `git worktree`.
-Read `plugins/sutra/workflows/build-orchestrator.workflow.js` -- its per-stage
-agent launches and the `ADAPT` note in the header -- and add that isolation
-plumbing when you need it rather than re-inventing it.
+The `/sutra:build-orchestrator` workflow is the sequential reference, not a
+parallel fan-out. It keeps a single writer by running one slice at a time: it
+takes every slice in `execution_plan/sessions/INDEX.md` that is not DONE, in
+INDEX order, and runs each through build, review, fix, validation, and commit
+in one working tree on the checked-out build branch. It commits each slice
+that validates before it starts the next, and stops at the first slice that
+does not. `${CLAUDE_PLUGIN_ROOT}/workflows/README.md` documents its stages and
+stop rules.
+
+The serial order is what keeps each commit to one slice. Every stage reads the
+slice's changes as the uncommitted changes in that tree, and the commit stage
+stages all of them, so a slice running beside it would land unreviewed edits
+in its commit. Running its build stage in a separate worktree does not help
+either: the review, validation, and commit stages read the session's tree and
+would find none of the build's changes.
+
+To run slices in parallel, apply this skill outside the workflow:
+
+1. Group the slices into tracks that do not depend on each other. A slice that
+   needs another track's output waits behind a sequential gate (control 4).
+2. Give each track its own worktree and branch (controls 1 and 5).
+3. Run each track in its own session, started in its worktree. A track can be
+   driven by `/sutra:build-orchestrator` when the INDEX on its branch lists
+   only that track's slices, so no two runs build the same slice.
+4. Merge the branches back yourself as the integrator (control 1), and
+   reconcile the INDEX and any other seam there.

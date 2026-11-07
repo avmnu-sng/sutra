@@ -102,5 +102,5 @@ size is not a proxy for risk.
   expensive mistake.
 - `agent-orchestration` decides how to prompt a delegate; this skill decides
   whether and how much to delegate. `parallel-agent-orchestration` and the
-  `build-orchestrator` workflow are the T3 fan-out machinery, and
+  `/sutra:build-orchestrator` workflow are the T3 fan-out machinery, and
   `multi-session-build` is the T3 gate set.

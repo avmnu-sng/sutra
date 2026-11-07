@@ -67,11 +67,11 @@ when it refuses one.
 
 ## What runs, and what it touches
 
-Sutra's only executable code is one Bash script, `hooks/sutra.sh`, wired in
+Sutra ships two scripts. The hook script, `hooks/sutra.sh`, is wired in
 `hooks/hooks.json` to five events: SessionStart, UserPromptSubmit,
 PostToolUse (Write, Edit, MultiEdit, NotebookEdit, Read, Bash, WebFetch,
 WebSearch, Agent, Task), PreCompact, and Stop. Each call has a 5 to 10 second
-timeout.
+timeout. The hook script:
 
 - **Reads:** the hook payload on standard input; `SUTRA_PROFILE`,
   `SUTRA_SECURITY`, `SUTRA_GATE`, and the plugin's own profile setting; the
@@ -90,9 +90,17 @@ timeout.
   the contract and the compaction brief are still printed as plain text and
   every other hook stays silent.
 
-Review it before you install: read `hooks/hooks.json` and `hooks/sutra.sh`, or
-run `claude --plugin-dir <path-to-this-folder> plugin details sutra` to list
-every component and its context cost.
+The workflow script, `workflows/build-orchestrator.workflow.js`, runs only
+when you invoke `/sutra:build-orchestrator` and approve the run. Its agents
+edit your files, run git and your test commands, and commit each validated
+slice to the checked-out branch. Every agent is told never to push, switch
+branches, or touch the default branch, and the run stops if the checked-out
+branch changes.
+
+Review both before you install: read `hooks/hooks.json`, `hooks/sutra.sh`, and
+`workflows/build-orchestrator.workflow.js`, or run
+`claude --plugin-dir <path-to-this-folder> plugin details sutra` to list every
+component and its context cost.
 
 ## Skills, agents, and the workflow
 
@@ -103,9 +111,12 @@ every component and its context cost.
   authoring, retros, effort calibration, and agent-facing docs.
 - **Subagents:** `architecture-reviewer`, `code-verifier`, `doc-sanitizer`,
   and `request-tracer`, each limited to Read, Grep, and Glob.
-- **Workflow:** `workflows/build-orchestrator.workflow.js` drives a
-  value-ranked execution plan slice by slice (build, review, fix, validate,
-  retro); `/sutra:scaffold-execution-plan` copies it into a project.
+- **Workflow:** `/sutra:build-orchestrator` drives a value-ranked execution
+  plan one slice at a time: build, adversarial review, bounded fix,
+  independent validation, then one commit per validated slice. It stops at the
+  first slice that does not validate, leaving that work uncommitted, and never
+  pushes. `/sutra:scaffold-execution-plan` lays down the plan it reads; see
+  `workflows/README.md`.
 
 Full documentation, the threat model, and the release notes live in the
 repository: https://github.com/avmnu-sng/sutra

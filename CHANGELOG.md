@@ -28,6 +28,14 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   write; a LICENSE in the plugin folder; a 512x512 listing icon.
 - `tests/hooks.sh`, behavior tests for the dispatcher on bash 3.2 and 5.
 
+- `SECURITY.md` (private vulnerability reporting) and `docs/security.md` (the
+  threat model, an OWASP mapping, and a hardening guide).
+- `scripts/check.sh`, one gate for contributors and CI: a byte-level ASCII and
+  NUL scan with an explicit binary allowlist, JSON and YAML parsing, `bash -n`,
+  shellcheck, frontmatter, the plugin directory's file limits, and the hook
+  tests.
+- CI validates the marketplace and the plugin with a pinned Claude Code CLI,
+  and Dependabot keeps the pinned actions current.
 ### Changed
 
 - Profiles are composed from layers (`core.md`, `standard.md`, `strict.md`), so
@@ -41,10 +49,37 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The hooks-cookbook freshness recipe no longer fetches from a hook.
 - Validation docs use `claude plugin validate --strict --profile directory`.
 
+- The build orchestrator is a native plugin workflow, `/sutra:build-orchestrator`;
+  copying it into a project is optional. It runs slices one at a time,
+  commits only slices that pass independent validation, stops at the first
+  slice that does not, refuses to start on invalid index rows, and frames plan
+  text as data.
+- `scaffold-execution-plan` starts only when a person invokes it, and its
+  kickoff template allows a closed set of read-only git commands and plain
+  placeholder values.
+- `scrub-before-publish` starts with a deterministic secret scanner (gitleaks
+  or trufflehog); `doc-sanitizer` is an advisory third pass that never repeats
+  a secret and treats instructions in scanned text as data.
+- `hooks-cookbook` gives a per-event table of what can block, builds JSON with
+  jq or JSON::PP, matches `git -C` and `git -c` commit variants, and keeps its
+  recipes in `reference/recipes.md`.
+- `examples/settings.json` drops allow rules that ran arbitrary programs or
+  wrote anywhere, and denies secret paths; the example hooks read the command
+  and answer with structured decisions.
+- CI runs with `contents: read`, a commit-pinned `actions/checkout`, and no
+  persisted credentials.
 ### Removed
 
 - `hooks/inject-profile.sh` and `hooks/ascii-guard.sh`, replaced by
   `hooks/sutra.sh`.
+
+### Fixed
+
+- The CI ASCII gate skipped any file containing a NUL byte as binary, so such
+  a file could carry hidden Unicode past it.
+- The build orchestrator ran slices concurrently in one working tree, so a
+  slice could commit another slice's unreviewed edits, and it committed
+  slices that failed validation.
 
 ### Security
 

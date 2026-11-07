@@ -15,8 +15,9 @@ not need, and replace every placeholder with real values for your project.
 | --- | --- | --- |
 | `CLAUDE.md.example` | In-repo import of the sutra profile | Teammates or CI check out the repo without the plugin installed |
 | `AGENTS.md.example` | Project-specific guardrails that compose with the profile | You want repo-local commands and invariants an agent cannot guess |
-| `settings.json` | Conservative scoped-permission allowlist + task-runner entrypoint | You want to cap what Claude Code may run in this repo |
-| `hooks/` | Opt-in, off-by-default enforcement hooks | You want automated gates that block on violations, not just guidance |
+| `settings.json` | Exact-command allowlist, secret-file denies, and the sandbox turned on | You want Claude Code to ask before anything unexpected and stay out of secrets |
+| `setup.yaml` | Machine-readable bootstrap manifest: setup steps, commands, ports, doc pointers | An agent should learn how to build, test, and navigate the repo without guessing |
+| `hooks/` | Opt-in, off-by-default hooks: a commit gate and an empty-test warning | You want automated checks, not just guidance |
 
 ## `CLAUDE.md.example`
 
@@ -73,34 +74,96 @@ layout, a load-order dependency, an env var that must be unset in a subprocess.
 
 ## `settings.json`
 
-A starting-point permission allowlist plus a task-runner entrypoint. Copy it to
-`.claude/settings.json` in your repo and adapt the lists to your toolchain.
+A conservative starting point for a repository's `.claude/settings.json`. Copy
+it there and edit it for your project. It does four things:
 
-Be clear-eyed about what it is: a prompt-reduction convenience for a repo you
-trust, NOT a security sandbox. It pre-approves read-only git inspection
-(`status`, `diff`, `log`, `show`, `branch`), directory and file reads (`ls`,
-`cat`, `rg`, `grep`, `Read`), and your task runners (`task`, `make`). Those last
-two run whatever targets your project defines, so allowing them is trusting your
-own build, not a read-only grant. The `deny` list (`rm -rf`, force push) is a
-coarse backstop that is trivially sidestepped (`rm -fr`, `git reset --hard`) --
-do not lean on it. The real boundary is Claude Code's default: anything not on
-the allowlist still stops for explicit approval. Trim the allowlist to only what
-you are comfortable auto-approving.
+- **Allows two exact commands**, `make test` and `make lint`. Replace them with
+  your project's own check commands (`npm test`, `task check`,
+  `go test ./...`). An exact rule matches only that command line: `make test`
+  runs without a prompt, while `make test V=1` or `make deploy` still asks.
+  The command still runs whatever your build file defines for that target, so
+  allowing it means trusting that file. Keep allow rules exact: `Bash(rg *)`
+  would also approve `rg --pre <program>`, which runs any program, and
+  `Bash(git diff *)` would approve `git diff --output=<path>`, which writes a
+  file anywhere.
+- **Allows nothing else.** Claude Code already reads files in the project and
+  runs a built-in set of read-only commands (`ls`, `cat`, `grep`, `find`,
+  read-only forms of `git`) without a prompt, so allow rules for them add
+  nothing. Everything else asks.
+- **Denies** reads of secrets: `.env` and `.env.*` at any depth in the project
+  (`.env.example` stays readable), any `secrets/` directory, `*.pem`, `id_rsa*`
+  and `id_ed25519*` files in the project, and `~/.ssh`, `~/.aws`, and
+  `~/.config/gh`. A `Read` deny also blocks Claude's Edit and Write tools on
+  the same path. Add your own credential stores (`~/.netrc`, `~/.npmrc`,
+  `~/.kube`, `~/.docker/config.json`). `*.pem` also matches public certificate
+  bundles, such as the `certifi/cacert.pem` in a virtualenv inside the project.
+  A `!` rule listed after it, such as `Read(!cacert.pem)`, carves one out for
+  Claude; for a sandboxed command that needs one, narrow `*.pem` to the
+  directories that hold your keys. The `rm -rf` and force-push denies stay as a
+  coarse backstop: a rule matches command text, so `rm -fr`,
+  `git push origin --force`, and `git push origin +main` all get past it.
+- **Turns on the sandbox** for Bash commands: OS-level isolation (macOS, Linux,
+  WSL2) that confines writes to the working directory and the temp directory,
+  asks before a command reaches a new network host, and here also blocks reads
+  of `~/.ssh`, `~/.aws`, and `~/.config/gh` by any sandboxed command. Claude
+  Code merges the `Read` deny rules above into the sandbox as well, so a
+  sandboxed command, `make test` included, cannot read those files either; if
+  your tests load `.env`, give them their settings another way or drop that
+  deny. `"autoAllowBashIfSandboxed": false`
+  keeps the permission prompts, which the sandbox otherwise skips for sandboxed
+  commands. `"allowUnsandboxedCommands": false` stops Claude from retrying a
+  blocked command outside the sandbox; with the retry on, an allow rule such as
+  `Bash(make test)` would also approve running that command unsandboxed without
+  a prompt. A tool that cannot run sandboxed, such as a container CLI, goes in
+  `sandbox.excludedCommands`, and then runs with your full access.
+
+The permission rules are not a substitute for the sandbox. They decide what
+Claude may start without asking, by matching the command text and the paths
+Claude's own file tools touch; they do not see what a program does once it
+runs. `Read` denies cover Claude's file tools and the file commands Claude Code
+recognizes in Bash (`cat`, `head`, `tail`, `sed`), but not `grep -r` over a
+directory or a script that opens files itself. The sandbox enforces its limits
+on every Bash command and the processes it starts, and on nothing else:
+Claude's file tools, hooks, and MCP servers run outside it. When the sandbox
+cannot start (native Windows, a missing dependency on Linux), Claude Code would
+run commands without it, so this file sets `sandbox.failIfUnavailable` to
+`true` and Claude Code refuses to start instead. Drop that key only if a
+teammate works where the sandbox cannot run and unsandboxed commands are
+acceptable there.
+
+Allow rules in a committed `.claude/settings.json` apply only after each
+teammate trusts the folder; deny rules apply right away.
 
 **It is strict JSON.** No comments, no trailing commas -- a `//` or `/* */` line
 will break parsing. Keep your notes in this README or a separate doc, not in the
-settings file. Adapt the `allow` and `deny` lists to your own runner and tools
-before relying on it.
+settings file.
+
+## `setup.yaml`
+
+A machine-readable manifest an agent reads first to learn how to set up, run,
+test, and navigate the repository: prerequisites with pinned versions, ordered
+setup steps, canonical commands, ports, dependent repos, and pointers to the
+authoritative docs. Copy it to your repo root and replace every
+`<placeholder>`. The commands it lists are documentation, not approval: an
+agent still runs each one through its permission prompts, and only the
+built-in read-only commands and the exact commands you allow in
+`.claude/settings.json` skip them.
 
 ## `hooks/`
 
-**Opt-in and off by default.** Hooks are enforcement gates that run
-automatically and can *block* an action on a violation -- stronger than the
-advisory guidance a profile provides. Nothing here is wired in until you add it
-to your own settings, so the plugin never imposes a hook you did not ask for.
+**Opt-in and off by default.** Two templates that run automatically once
+wired, which makes them stronger than the advisory guidance a profile provides:
 
-See [`hooks/README.md`](hooks/README.md) for the available hooks and how to
-wire each one into your settings.
+- `source-change-requires-test.sh` warns about, or blocks, a commit that
+  changes source without a test. It runs as a git `pre-commit` hook (the
+  reliable form) or as a Claude Code `PreToolUse` hook that acts only on
+  `git commit`.
+- `empty-test-detector.sh` warns when Claude writes a test with no assertion.
+  It is a `PostToolUse` hook, which runs after the write and cannot undo it.
+
+Nothing here is wired in until you add it to your own settings, so the plugin
+never imposes a hook you did not ask for. See [`hooks/README.md`](hooks/README.md)
+for what each hook event can block and how to wire each script.
 
 ---
 
