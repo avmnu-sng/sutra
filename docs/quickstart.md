@@ -1,9 +1,9 @@
 # Quickstart
 
 See Sutra work once, end to end, in about ten minutes. You will install the
-plugin, start a session that picks up its operating profile, run a skill on a
-tiny throwaway repo, and watch the strict-profile ASCII warning fire without
-ever blocking a write.
+plugin, start a session that picks up its operating contract, run a skill on a
+tiny throwaway repo, and watch the strict profile's checks fire without ever
+blocking a tool call.
 
 No real project required. We will use a toy service called `snippet-store` --
 a single-process HTTP app with two routes (`POST /snippets` to save text,
@@ -32,21 +32,30 @@ and retry.
 Skills and the operating profile register at session start, not mid-session.
 So start a new session (or restart Claude Code).
 
-At the top of the new session, Sutra's `SessionStart` hook prints the active
-operating profile to stdout, and Claude Code folds that text into context. You
-have not set a profile yet, so you get the default, `standard`. In context you
+At the top of the new session, Sutra's `SessionStart` hook composes the
+operating contract for the active profile and hands it to Claude Code, which
+adds it to the session context. You have not set a profile yet, so you get the
+default, `standard`: the core layer plus the standard stance. In context you
 will see a block that opens like this:
 
 ```
-# Sutra profile: standard
+Sutra profile: standard.
 
-The default operating stance: a senior engineer who traces before theorizing,
-thinks in systems, quantifies trade-offs, and owns the outcome...
+# Sutra operating contract
+
+This core holds for the whole session. Sutra adds short rules at the moment
+they apply (a commit, a test or migration edit, publishing, delegation, web
+content); each names the `/sutra:<skill>` that carries the depth.
 ```
 
-That block is the contract for the whole session. Nothing was written to your
-repo to make it appear -- it lives only in the session context. To confirm it
-took hold, ask the agent a quick question:
+The same hook scans the instruction files the project loads (`CLAUDE.md`,
+`AGENTS.md`, rules files) for hidden Unicode and warns both you and Claude if
+it finds any.
+
+That block is the contract for the whole session, and Sutra adds it again
+after a compaction. Nothing was written to your repo to make it appear -- it
+lives only in the session context. To confirm it took hold, ask the agent a
+quick question:
 
 ```
 What operating profile are you running, and name two rules it puts on you.
@@ -57,9 +66,10 @@ real code path before theorizing, and quantify trade-offs with numbers).
 
 ## 3. Pick a profile
 
-Three layered profiles ship, each a superset of the one below: `lite`,
-`standard` (default), and `strict`. Select one two ways, with env winning
-over file winning over the default:
+Three profiles ship, built from layers: `lite` is the core, `standard`
+(default) adds the standard stance and the rule cards, and `strict` adds a
+house style on top of both. Your own choice wins: the `SUTRA_PROFILE`
+environment variable, then the plugin's `profile` setting, then the default.
 
 ```bash
 # Globally, for this shell:
@@ -67,23 +77,26 @@ export SUTRA_PROFILE=strict
 ```
 
 ```bash
-# Or per project, checked into the repo root:
+# Or a project's request for more rigor, checked into the repo root:
 echo strict > .sutra
 ```
 
-The `.sutra` file is a single line -- just the profile name, no quotes. Set
-either to `off` to inject nothing while keeping the skills installed.
+The `.sutra` file is a single line -- just the profile name, no quotes. It
+applies only when you have not chosen a profile yourself, and it can only
+raise the profile to `strict`: Sutra refuses a `.sutra` that asks for `lite`
+or `off`, and tells you so. Set `SUTRA_PROFILE=off` to drop the contract while
+keeping the skills installed; the hidden-Unicode warnings still run.
 
-For the rest of this walkthrough, turn on `strict` so you can see its one
-guardrail later:
+For the rest of this walkthrough, turn on `strict` so you can see its checks
+later:
 
 ```bash
 export SUTRA_PROFILE=strict
 ```
 
-Start a new session so the hook re-reads it. Now the injected block opens with
-`# Sutra profile: strict`, which adds the publishing and hygiene rules on top
-of everything in `standard`.
+Restart Claude Code from that shell so the hooks see the variable. Now the
+context block opens with `Sutra profile: strict.`, and the contract carries the
+strict house style after everything in `standard`.
 
 ## 4. Invoke a skill on the toy service
 
@@ -129,35 +142,47 @@ each one.
 It turns the search into a checklist, fixes each hit, then re-searches until
 the list is empty -- so no stray caller survives the rename.
 
-## 5. See the strict guardrail
+## 5. See the strict checks
 
-Under `strict`, Sutra adds one -- and only one -- active guardrail, and it is
-advisory: a non-blocking ASCII warning on writes. Trigger it. Ask the agent to write a
-file that contains a real non-ASCII character, such as a Unicode em dash
-(U+2014) or a curly quote, rather than the ASCII `--`:
+Under `strict`, Sutra adds two checks to what every `standard` session gets.
+Neither blocks a tool call.
+
+**The ASCII notice.** Ask the agent to write a file that contains a real
+non-ASCII character, such as a Unicode em dash (U+2014) or a curly quote,
+rather than the ASCII `--`:
 
 ```
 Write a file notes.md whose first heading uses a real Unicode em dash
 character, not two hyphens.
 ```
 
-The write goes through and the file lands on disk. Then a system message like
-this appears:
+The write goes through and the file lands on disk. Then Sutra adds a note like
+this to Claude's context (it goes to Claude rather than to you, so ask the
+agent what Sutra reported):
 
 ```
-sutra(strict): non-ASCII byte in notes.md (first at line 1). Prefer ASCII:
--- for an em dash, -> for an arrow, plain quotes. Set SUTRA_PROFILE=standard
-to silence.
+sutra (strict): notes.md has a non-ASCII byte at line 1. Prefer ASCII: -- for
+a dash, -> for an arrow, plain quotes.
 ```
 
-Read that carefully: it points at the file and the first offending line, and
-it suggests the ASCII substitutes. It does **not** block, cancel, or rewrite
-the write -- the file is already there. That is the invariant: profiles add
-guidance, they never change what a write is allowed to do. The lone ASCII
-warning is advisory too; it just surfaces the byte and keeps going. If you
-want a hard gate, build it outside Sutra (a pre-commit check or CI).
+It names the file and the first offending line and suggests the ASCII
+substitutes. It does **not** block, cancel, or rewrite the write -- the file
+is already there.
 
-To silence the warning, drop back to a lower profile and start a new session:
+**Verify-before-stop.** Ask for a small code change, such as a size limit in
+a new `server.js` for `POST /snippets`. If the agent tries to finish without
+having run a check command since the edit, Sutra's Stop hook asks it once to
+run the project's checks -- build, tests, lint -- and read the result, or to
+say in one line why they do not apply. It asks at most once per batch of edits,
+never when the agent ends by asking you a question, and `SUTRA_GATE=off` turns
+it off.
+
+That is the invariant: Sutra never blocks a tool call, and under `strict` it
+asks for checks at most once per batch of edits. If you want a hard gate,
+build it outside Sutra (a pre-commit check or CI).
+
+To drop both checks, go back to `standard` and restart Claude Code from that
+shell:
 
 ```bash
 export SUTRA_PROFILE=standard
@@ -165,14 +190,15 @@ export SUTRA_PROFILE=standard
 
 ## 6. Where next
 
-You have seen the whole loop: install, profile-in-context, a skill on a real
-task, and the strict guardrail. From here:
+You have seen the whole loop: install, the contract in context, a skill on a
+real task, and the strict checks. From here:
 
 - [`docs/skills.md`](skills.md) -- the full skills catalog and a decision map
   that routes each task to the one skill that fits (and names the sibling to
   reach for instead when two overlap).
-- [`docs/profiles.md`](profiles.md) -- the three profiles in depth, the
-  resolution order, and the complete principle-to-profile mapping table.
+- [`docs/profiles.md`](profiles.md) -- the layers in depth, the rule cards
+  and their triggers, precedence, the security floor, the strict stop gate,
+  and the rule-to-layer mapping table.
 - [`README.md`](../README.md) -- the overview: what ships in the kit (skills,
   subagents, profiles, workflows, examples) and how it all composes.
 

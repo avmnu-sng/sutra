@@ -33,14 +33,19 @@ that start from bare source.
 The template documents two mutually exclusive ways to wire it up:
 
 - **Option A -- vendored `@import`.** Vendor the sutra repo into your project
-  (submodule, subtree, or a plain clone under `vendor/`) and `@import` the
-  profile file you want. `@import` resolves **local paths only** -- it cannot
-  fetch a URL or a remote git ref, so the vendored copy must be checked in and
-  present on disk. This works for everyone, plugin or not.
+  (submodule, subtree, or a plain clone under `vendor/`) and `@import` its
+  profile layers in order, stopping at the profile you want: `core.md`
+  (`lite`), then `standard.md` (`standard`), then `strict.md` (`strict`).
+  `@import` resolves **local paths only** -- it cannot fetch a URL or a remote
+  git ref, so the vendored copy must be checked in and present on disk. This
+  works for everyone, plugin or not.
 - **Option B -- a `.sutra` marker.** If everyone on the team already has the
-  plugin, drop a one-line `.sutra` file at the repo root naming the profile
-  (for example `strict`). The plugin reads the marker and applies that profile.
-  Lightest touch, but it does nothing for a checkout without the plugin.
+  plugin and you want `strict`, drop a one-line `.sutra` containing `strict`
+  at the repo root. It raises the profile to `strict` for teammates who have
+  not chosen one themselves (`SUTRA_PROFILE` or the plugin's `profile`
+  setting); a `.sutra` naming `lite` or `off` is refused, and `standard` is
+  already the default. Lightest touch, but it does nothing for a checkout
+  without the plugin.
 
 Pick one, not both, so there is a single source of truth for which profile
 applies. Below the wiring, the template leaves a **Project specifics** section

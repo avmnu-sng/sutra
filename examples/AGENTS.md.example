@@ -7,10 +7,10 @@
 <!-- NOTE ------------------------------------------------------------------
 sutra ships the *operating profile* -- the general working style, review
 posture, and safety defaults an agent applies everywhere -- through its
-plugin. Install the plugin (or, if you vendor a copy, add a local import
-such as `@vendor/sutra/plugins/sutra/profiles/standard.md`) so this file
-does NOT have to restate
-generic agent behavior.
+plugin. Install the plugin (or, if you vendor a copy, add local imports of
+its layers in order, such as `@vendor/sutra/plugins/sutra/profiles/core.md`
+then `@vendor/sutra/plugins/sutra/profiles/standard.md`) so this file does
+NOT have to restate generic agent behavior.
 
 Keep THIS file focused on what is specific to THIS repository: the exact
 commands, the invariants a newcomer would not guess, and where to look
@@ -51,8 +51,8 @@ that actually bind changes in your repo:
   breakdowns, and session logs stay local (see `.gitignore`). Never stage
   them, even under a "commit everything" instruction.
 
-<!-- Some teams enforce ASCII-only files (sutra's strict profile does); if
-yours does, state it here and verify with `file <path>`. -->
+<!-- Some teams require ASCII-only files (sutra's strict profile asks for it);
+if yours does, state it here and verify with `file <path>`. -->
 
 <!-- NOTE: Add project-specific invariants a newcomer could not guess -- a
 required column order, a cache byte layout to preserve, a load-order
