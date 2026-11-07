@@ -6,6 +6,8 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-07
+
 Sutra is now two plugins, so that its skills can be listed in Anthropic's
 plugin directory, which accepts hooks, workflow scripts, and files other than
 Markdown, text, JSON, YAML, and a few image types only from Verified
