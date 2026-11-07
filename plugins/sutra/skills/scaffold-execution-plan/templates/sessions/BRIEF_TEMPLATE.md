@@ -39,7 +39,7 @@ do not carry a question into the build.
 
 - Branch/worktree: `<branch-or-worktree-path>` (NOT the default branch)
 - Repo root: `<absolute-path>`
-- Fast local check: `<command>` (see `execution_plan/DEV_LOOP.md`)
+- Fast local check: the fast check in `execution_plan/DEV_LOOP.md`
 - Language/runtime version: `<version>` -- pinned in `<file>`
 - Entry points to touch: `<path>`, `<path>`
 - Frozen contracts this slice consumes: `<contract-or-interface>` (see
@@ -112,8 +112,8 @@ deferral of declared scope.
 - [ ] Full slice scope implemented (no silent shrink; scope changes were
       renegotiated in `MASTER_PLAN.md`, not dropped).
 - [ ] Every acceptance criterion above passes via its named check.
-- [ ] Fast local check green: `<command>`.
-- [ ] Pre-merge gate green: `<command(s)>` (see `DEV_LOOP.md`).
+- [ ] Fast local check green (the fast check in `DEV_LOOP.md`).
+- [ ] Pre-merge gate green (the pre-merge gate in `DEV_LOOP.md`).
 - [ ] Adversarial review clean, or remaining findings logged with reason.
 - [ ] Independent validation clean, or gaps logged with reason.
 - [ ] Handoff written at `execution_plan/handoffs/<slice-id>.md`.

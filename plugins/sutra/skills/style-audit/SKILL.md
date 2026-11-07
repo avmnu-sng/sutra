@@ -24,9 +24,10 @@ or when reviewing someone else's diff.
 
 ### 1. Files are ASCII-only when the project's style calls for it
 
-This rule applies only when the project enforces ASCII -- sutra's strict
-profile (`SUTRA_PROFILE=strict`) does. If the project does not enforce
-ASCII, skip this rule and let its own encoding conventions stand.
+This rule applies only when the project's style calls for ASCII -- sutra's
+strict profile asks for it (the session contract opens with
+`Sutra profile: strict.`). If the project does not call for ASCII, skip this
+rule and let its own encoding conventions stand.
 
 - No non-ASCII bytes anywhere in a committed text file.
 - Write `--` for an em dash, `->` for an arrow, and straight quotes (`'`
@@ -126,8 +127,9 @@ you see the full scope.
 1. Enumerate the touched files and diagrams in the change.
 2. For each rule (1 through 7), scan the change and list violations. Include
    the file and the symbol or section, never a bare line number. Skip rule 1
-   (ASCII-only) unless the project enforces ASCII -- i.e. `SUTRA_PROFILE` is
-   `strict` or the project's own style declares ASCII-only.
+   (ASCII-only) unless the project calls for ASCII -- i.e. the Sutra contract
+   in context names the strict profile, or the project's own style declares
+   ASCII-only.
 3. Fix the collected violations.
 4. Re-scan from step 2 against the whole change, not just the spots you
    edited -- a fix can introduce a new violation.
@@ -139,7 +141,7 @@ you see the full scope.
 ### Checklist template
 
 ```
-[ ] Rule 1  ASCII-only (only if the project enforces ASCII): `file` reports
+[ ] Rule 1  ASCII-only (only if the project calls for ASCII): `file` reports
             ASCII text for every changed file
 [ ] Rule 2  Comments explain why; no restate-the-code comments remain
 [ ] Rule 3  Docs describe current state; reasoning + constraint present;

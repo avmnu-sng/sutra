@@ -1,24 +1,58 @@
 {
-  "description": "Sutra: inject the active operating profile at session start, and (strict profile only) warn on non-ASCII writes.",
+  "description": "Sutra harness: the operating contract at session start, short rule cards when they apply, hidden-Unicode warnings, a compaction brief, and under strict one verify-before-stop nudge. Reads the hook payload, SUTRA_* variables, the plugin's profile setting (CLAUDE_PLUGIN_OPTION_PROFILE), the project's .sutra file, and, to scan them in place for hidden characters, the agent instruction files at session start and each file Claude writes or reads; writes only stdout and its plugin data directory; no network calls; never blocks a tool call.",
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/inject-profile.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/sutra.sh\" session-start",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/sutra.sh\" prompt",
+            "timeout": 5
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Read|Bash|WebFetch|WebSearch|Agent|Task",
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/ascii-guard.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/sutra.sh\" post-tool",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/sutra.sh\" pre-compact",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/sutra.sh\" stop",
+            "timeout": 5
           }
         ]
       }

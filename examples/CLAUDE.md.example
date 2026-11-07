@@ -21,9 +21,12 @@
   OPTION A -- @import a vendored/submoduled profile.
 
   Vendor the sutra repo into your project (git submodule, subtree, or a
-  plain clone under a `vendor/` directory), then import the profile file
-  you want. The line below pulls the "standard" profile; swap the filename
-  for another profile (for example `strict.md`) to change the ruleset.
+  plain clone under a `vendor/` directory), then import the profile layers
+  you want, in order. Each file is one layer: `core.md` alone is "lite",
+  `core.md` then `standard.md` (the two lines below) is "standard", and
+  adding `strict.md` after both is "strict". An import carries the contract
+  text only; the rule cards, hidden-Unicode warnings, and strict stop gate
+  come from the plugin's hooks.
 
   IMPORTANT: @import resolves LOCAL PATHS ONLY. It cannot fetch a URL or a
   remote git ref. The path must exist on disk relative to this file at the
@@ -32,24 +35,30 @@
 
   Replace the PLACEHOLDER path with wherever you vendored sutra.
 -->
+@vendor/sutra/plugins/sutra/profiles/core.md
 @vendor/sutra/plugins/sutra/profiles/standard.md
 
 <!--
-  OPTION B -- pick the profile with a `.sutra` marker file (plugin users).
+  OPTION B -- ask for the strict profile with a `.sutra` marker file
+  (plugin users).
 
   If teammates DO have the sutra plugin installed, you can skip the @import
   entirely. Instead, drop a file named `.sutra` at the repo root whose only
-  contents are the profile name, for example:
+  contents are:
 
       strict
 
-  The plugin reads that marker and applies the named profile to this repo.
+  The plugin raises the profile to strict for anyone who has not chosen a
+  profile themselves (SUTRA_PROFILE or the plugin's profile setting). A
+  repository can only raise the profile: a `.sutra` naming lite or off is
+  refused, and standard is already the default.
   This is the lightest-touch option, but it only affects people who already
   have the plugin -- it does nothing for a clean checkout without the plugin.
 
   Rule of thumb:
     - Want the profile to work for everyone, plugin or not -> Option A.
-    - Everyone on the team has the plugin -> Option B (a one-line `.sutra`).
+    - Everyone on the team has the plugin and you want strict -> Option B
+      (a one-line `.sutra`); for standard you need neither.
   Do not use both at once; pick one so there is a single source of truth.
 -->
 

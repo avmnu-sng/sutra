@@ -1,17 +1,20 @@
 ---
-description: Scaffold a repeatable execution-plan structure and wire in the build-orchestrator workflow when starting a large, multi-session build that must survive across many sessions.
+description: Scaffold a repeatable execution-plan structure (master plan, session protocol, dev loop, slice index, and per-slice templates) for a large, multi-session build that must survive across many sessions, for the /sutra:build-orchestrator workflow to drive.
+disable-model-invocation: true
 ---
 
 # Scaffold execution plan
 
 Lay down a durable, resumable structure for a build too large for one
-session, then wire in the build-orchestrator workflow that drives it. The
+session, for the `/sutra:build-orchestrator` workflow to drive. The
 structure is the source of truth across sessions: what to build next, in
 what order, and what "done" means for each unit of work.
 
 This skill copies ready-made skeleton files that carry explicit TODO
 placeholders. It does not invent project specifics -- you (or a later
-planning pass) fill the placeholders against the real repo.
+planning pass) fill the placeholders against the real repo. It writes many
+files into the repo, so only a person starts it, with
+`/sutra:scaffold-execution-plan`; Claude does not start it on its own.
 
 ## When to use
 
@@ -73,20 +76,14 @@ execution_plan/
     KICKOFF_TEMPLATE.md
     briefs/          (one brief per slice, created as slices start)
   handoffs/          (one handoff per completed slice)
-.claude/
-  workflows/
-    build-orchestrator.workflow.js   (copied from this plugin)
 ```
 
-Copy the orchestrator from this plugin into the target project:
-
-```
-cp "${CLAUDE_PLUGIN_ROOT}/workflows/build-orchestrator.workflow.js" \
-   .claude/workflows/build-orchestrator.workflow.js
-```
-
-`${CLAUDE_PLUGIN_ROOT}` is this plugin's root at runtime. If the target
-already has a copy, diff before replacing -- do not clobber local edits.
+The orchestrator ships with this plugin and runs as
+`/sutra:build-orchestrator` (Step 3); there is nothing to copy.
+`${CLAUDE_PLUGIN_ROOT}` is this plugin's root at runtime. To change the
+orchestrator's prompts, stages, or plan format, follow the Customize section
+of `${CLAUDE_PLUGIN_ROOT}/workflows/README.md`; a project copy runs as
+`/build-orchestrator` and no longer changes when the plugin updates.
 
 ## Step 2 -- copy and adapt the templates
 
@@ -114,7 +111,10 @@ Copy each template into the `execution_plan/` tree from Step 1:
 - `sessions/BRIEF_TEMPLATE.md`, `sessions/HANDOFF_TEMPLATE.md`,
   `sessions/KICKOFF_TEMPLATE.md` -> `execution_plan/sessions/`. These are
   per-slice stencils: copy one per slice into `briefs/`, `handoffs/`, and
-  the next-session kickoff as slices start and finish.
+  the next-session kickoff as slices start and finish. An agent drafts each
+  kickoff and a person pastes it into the next session, where it carries
+  that person's authority, so the kickoff template allows only a closed set
+  of four git commands and the person reads every draft before pasting it.
 
 Each template carries explicit `TODO:` placeholders (the slice DAG and
 acceptance criteria, the dev-loop commands, the `Do not regress` bullets,
@@ -152,36 +152,47 @@ enforced, not merely documented.
 
 ## Step 3 -- run it
 
-Launch the orchestrator workflow in the target project (from the build
-branch/worktree). It reads `execution_plan/sessions/INDEX.md`, selects every
-non-DONE slice in listed order, and drives each through the build -> review ->
-fix -> validate -> retro stages.
+Run `/sutra:build-orchestrator` in the target project, from the build
+branch or worktree (`/build-orchestrator` for a customized copy). It reads
+`execution_plan/sessions/INDEX.md`, selects every non-DONE slice in listed
+order, and drives each through the build -> review -> fix -> validate ->
+retro and commit stages, committing each validated slice to the checked-out
+branch and stopping at the first slice that does not validate.
 
 ## Resume
 
 Resume is mechanical, driven by INDEX status -- never by recall.
 
-- INDEX is the source of truth. DONE slices are skipped. The next PENDING
-  slice whose dependencies are all DONE is selected.
-- A BLOCKED slice halts advancement past it until its note is cleared.
-- Relaunching after a finished slice picks up at the next one -- no manual
-  bookkeeping beyond keeping INDEX honest.
+- The INDEX is the source of truth. A run skips every DONE row and takes every
+  other row -- PENDING, IN_PROGRESS, or BLOCKED -- in INDEX order, one slice at
+  a time. It does not check dependencies, so list the slices in an order that
+  satisfies them. A BLOCKED row is retried, not skipped.
+- A run stops at the first slice that does not validate, leaves that slice's
+  changes uncommitted, and starts no later slice. Finish the slice and commit
+  it with its row set to DONE, or discard its changes, then run again; a run
+  refuses to start on a dirty tree. The Resume section of
+  `${CLAUDE_PLUGIN_ROOT}/workflows/README.md` covers each case.
+- After a run that completes, the next run starts at the first row that is not
+  DONE -- no bookkeeping beyond keeping the INDEX honest.
 
-## Gates: why a "gate" means relaunch
+## Gates: where a person steps in
 
-A Workflow cannot pause for human input mid-run. So a review-then-fix or
-validate-then-fix "gate" is not an in-run prompt: the script runs a phase,
-returns control, and you inspect the result and relaunch to continue.
+A `/sutra:build-orchestrator` run does not pause between slices. It drives
+every remaining slice through every stage and commits each one that
+validates. A person steps in when the run ends, complete or stopped at a slice
+that did not validate: read the run's summary and the stage output in
+`/workflows`, make the call it needs, and run it again.
 
-Practical consequences:
+`SESSION_PROTOCOL.md` governs sessions run by hand, one slice each, with a
+human gate between them. Under `/sutra:build-orchestrator`, that gate is
+replaced by the workflow's rule of stopping at the first slice that does not
+validate. Start a run only when each validated slice may be committed without
+a person reading it first; to review every slice before the next one starts,
+run the sessions by hand instead.
 
-- After each gated phase, the orchestrator returns. Read the output, make
-  any call it asked for, and relaunch to advance.
-- Keep INDEX updated at each return so a relaunch resumes at the right
-  place even in a fresh session.
-- Do not design the loop to expect an interactive answer mid-run -- encode
-  the decision in a file (INDEX status, a logged finding) and let the next
-  launch read it.
+The workflow asks no questions mid-run, so encode each decision in a file the
+next run reads -- an INDEX status, a brief -- rather than in an answer you
+expect it to wait for.
 
 ## Cutting a release
 
@@ -250,7 +261,6 @@ Do NOT:
 - [ ] Step 0 pressure-test run; deltas written into `## Do not regress`.
 - [ ] All `execution_plan/` files created from `templates/` (none
       overwritten).
-- [ ] Orchestrator copied into `.claude/workflows/`.
 - [ ] Plan phase runs read-only; implement phase's write tools are a
       separate frontmatter allowlist.
 - [ ] `DEV_LOOP.md` fast check and pre-merge gate filled or explicitly
@@ -259,3 +269,5 @@ Do NOT:
 - [ ] Release milestones grouped with a version/tag scheme, and cut
       criteria filled or explicitly marked TODO.
 - [ ] No project specifics invented -- every unknown is a visible TODO.
+- [ ] `/sutra:build-orchestrator` (or a customized copy, run as
+      `/build-orchestrator`) launched from the build branch or worktree.

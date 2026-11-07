@@ -13,7 +13,15 @@
 # Conventions used below:
 #   - `<angle-bracket>` tokens are placeholders you MUST replace.
 #   - All paths are relative to the repo root unless stated otherwise.
-#   - Commands are literal shell strings the agent can run as-is.
+#   - Commands are literal shell strings. They document how to work in the
+#     repo; they do not approve anything. An agent still runs each one through
+#     its permission prompts. To skip a prompt for a command you trust, allow
+#     that exact command in .claude/settings.json (see sutra's
+#     examples/settings.json), never a wildcard, and never skip the prompts
+#     for a whole session to get through setup.
+#   - Commands run tools the repository pins: a lockfile, a toolchain file, or
+#     an exact version. Never `curl ... | sh`, `@latest`, or `npx` / `uvx` /
+#     `pipx run` of a package without a pinned version.
 
 # ---------------------------------------------------------------------------
 # Identity -- what this repo is, in one breath.
@@ -39,7 +47,7 @@ prerequisites:
   # Language runtimes and their required versions.
   runtimes:
     - name: "<runtime>"           # e.g. the language runtime
-      version: "<x.y.z>"          # exact or range, e.g. ">=1.2 <2"
+      version: "<x.y.z>"          # exact, e.g. "1.2.3" -- not a range
       # How the agent should check it is present.
       check: "<runtime> --version"
   # Package / dependency managers.
@@ -64,10 +72,11 @@ prerequisites:
 # ---------------------------------------------------------------------------
 setup_steps:
   - name: "Install dependencies"
-    run: "<package-manager> install"
+    run: "<package-manager> <install-from-lockfile command>"
+    note: "Install exactly what the lockfile pins (e.g. npm ci, uv sync --locked, cargo fetch --locked); a plain install can resolve new versions."
   - name: "Copy environment template"
-    run: "cp .env.example .env"
-    note: "Fill in the <placeholder> tokens (see `placeholders:` below)."
+    run: "[ -e .env ] || cp .env.example .env"
+    note: "Never overwrites an existing .env. A person fills in the secret values (see `placeholders:` below); keep .env out of the agent's reach with Read deny rules, as sutra's examples/settings.json does."
   - name: "Start backing services"
     run: "<command to start local services, e.g. the container stack>"
   - name: "Initialize schema / migrate"
@@ -142,16 +151,19 @@ ports:
 
 # ---------------------------------------------------------------------------
 # Dependent repos -- sibling repositories this one builds/tests against.
-# Clone them next to this repo (or at `path`) before cross-repo work.
+# Clone them next to this repo (or at `path`) before cross-repo work, and check
+# out `ref`: a tag or full commit SHA, not a moving branch.
 # ---------------------------------------------------------------------------
 dependent_repos:
   - name: "<shared-library-repo>"
     url: "<git-remote-url>"
+    ref: "<tag-or-commit-sha>"
     # Where the agent should expect it checked out, relative to this repo.
     path: "../<shared-library-repo>"
     relationship: "<compile-time dependency | runtime service | test fixture>"
   - name: "<downstream-consumer-repo>"
     url: "<git-remote-url>"
+    ref: "<tag-or-commit-sha>"
     path: "../<downstream-consumer-repo>"
     relationship: "<consumes this repo's published artifact>"
 

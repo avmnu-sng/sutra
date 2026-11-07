@@ -28,32 +28,17 @@ changes -- a stale row either reruns finished work or strands unfinished work.
 
 <!-- Add one row per slice. Order top-to-bottom in intended execution order. -->
 
-## Branch catalog
+## Build branch
 
-Each slice does its work on its own branch. This table doubles as the branch
-catalog: it maps a slice to its branch, its latest commit, and the base it
-branched from without leaving this file. Keep it row-aligned with the slice
-table above -- one row per slice id, in the same order.
-
-| Slice id | Branch | SHA | Base |
-| --- | --- | --- | --- |
-| <slice-id-1> | slice/<slice-id-1> | <merge-sha> | main |
-| <slice-id-2> | slice/<slice-id-2> | <head-sha> | main |
-| <slice-id-3> | slice/<slice-id-3> | TODO: add on first commit | main |
-
-<!-- One row per slice, same ids and order as the slice table above. -->
-
-- **Branch** -- the git branch the slice's work lives on. Derive it from the
-  slice id so the two never drift (e.g. `slice/<slice-id>`).
-- **SHA** -- the branch tip, or the merge commit once the slice is integrated.
-  Leave a `TODO` marker until the first commit exists.
-- **Base** -- the branch or commit this slice branched from. Usually the
-  integration branch (e.g. `main`); name another slice's branch when slices
-  stack on each other.
+Every slice is built and committed on one build branch: `<build-branch-name>`,
+created from `<base-branch>`. `/sutra:build-orchestrator` never creates or
+switches a branch. It commits each slice that validates to the checked-out
+branch, one commit per slice, and that commit also sets the slice's row above
+to `DONE`.
 
 ## Column notes
 
-- **Slice id** -- stable identifier used in branch names, briefs, and handoffs.
+- **Slice id** -- stable identifier used in briefs and handoffs.
   Never reuse or renumber an id once work has started.
 - **Title** -- short human-readable name; no need to be unique.
 - **Status** -- one of the values above. Only `DONE` is skipped on resume.

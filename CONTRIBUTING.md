@@ -10,12 +10,16 @@ and honest are welcome.
   file -- not in examples, not in commit messages. Use neutral, invented
   examples.
 - **ASCII only.** No non-ASCII bytes in any file. Write `--` for an em dash,
-  `->` for an arrow, straight quotes. Verify with `file <path>` reporting
-  `ASCII text`.
-- **Degrade to silence, never to obstruction.** Nothing in Sutra may block or
-  break a user's own work. Hooks warn at most; they never fail a write.
-- **Layered profiles stay supersets.** A rule in `standard` must also hold in
-  `strict`. Adding a rule to a lower profile adds it to every higher one.
+  `->` for an arrow, straight quotes. Verify with `bash scripts/check.sh`,
+  which scans every tracked file's bytes.
+- **Never block a tool call; degrade to silence.** Sutra never blocks a tool
+  call. Under `strict` it may ask the agent, at most once per batch of edits,
+  to run the project's checks before it stops. Every hook degrades to silence
+  when its tooling is missing.
+- **Profile layers compose.** `lite` is `core.md`, `standard` adds
+  `standard.md`, and `strict` adds `strict.md` on top of both. A rule in
+  `core.md` holds for every profile except `off`, so put each rule in the
+  lowest layer where it is always true and never repeat it in a higher one.
 
 ## Adding a component
 
@@ -25,21 +29,58 @@ and honest are welcome.
 - **Subagent:** add `plugins/sutra/agents/<name>.md` with `name`,
   `description`, and a minimal `tools` list in frontmatter. Read-only agents
   must be told not to modify files.
-- **Profile rule:** edit `plugins/sutra/profiles/<level>.md`. Keep it tight --
-  profiles are injected every session.
+- **Profile rule:** a rule that is always true goes in one layer,
+  `plugins/sutra/profiles/{core,standard,strict}.md`. Keep it tight -- the
+  contract is injected at every session start and compaction.
+- **Card:** a rule that matters at one moment (a commit, a kind of edit, a
+  tool result) becomes a card instead: `plugins/sutra/cards/<id>.md` (plus
+  `<id>.strict.md` for strict-only lines), a `card <id>` call in the matching
+  handler of `plugins/sutra/hooks/sutra.sh`, and a case in `tests/hooks.sh`.
 - **Doc:** long-form reference goes under `docs/`.
 
 ## Validate before opening a PR
 
 ```
-claude plugin validate .
-claude plugin validate ./plugins/sutra
-find . -type f ! -path './.git/*' -exec file {} \; | grep -v 'ASCII text' || echo "all ASCII"
+bash scripts/check.sh
+claude plugin validate --strict .
+claude plugin validate --strict --profile directory ./plugins/sutra
 ```
 
-CI (`.github/workflows/ci.yml`) runs the ASCII, JSON/YAML, shell-syntax, and
-frontmatter checks on every push and pull request. Run `claude plugin validate`
-locally (a schema check) before opening a PR.
+`scripts/check.sh` runs the same checks as CI's `checks` job and prints one
+line per check:
+
+- **ascii:** no NUL or non-ASCII byte, and no control byte other than tab,
+  LF, and CR before LF, in any file except the two allowlisted binaries,
+  `docs/demo.gif` and `plugins/sutra/assets/icon.png`.
+- **json**, **yaml:** every JSON file parses with `jq`, and every YAML file
+  with Python's PyYAML.
+- **bash-syntax**, **shellcheck:** `bash -n` and `shellcheck -S warning` on
+  every `*.sh` file.
+- **frontmatter:** inside its `---` block, every skill declares a
+  `description`, and every agent a `name` and a `description`.
+- **plugin-limits:** the plugin directory's folder limits for
+  `plugins/sutra`: at most 512 files, every file other than an image or font
+  under 256 KiB, no symlinks, no `..` or absolute path in a `plugin.json`
+  path, and no `..`, absolute path, command substitution, or variable other
+  than a braced `${CLAUDE_PLUGIN_ROOT}` in a `hooks.json` command.
+- **hook-tests:** `tests/hooks.sh`, which runs
+  `plugins/sutra/hooks/sutra.sh` through its behavior cases in a clean
+  environment, and runs them again under `/bin/bash` when that is a different
+  bash from the one on your `PATH`, so macOS bash 3.2 is always covered.
+
+It checks tracked files plus untracked files git does not ignore, so a new
+file is checked before you stage it. It needs `git`, `jq`, and `perl`.
+Without `shellcheck`, or `python3` with PyYAML, it prints a `skip` line for
+that check; CI sets `CI=true`, which turns a skip into a failure. While
+working on the hook, `bash tests/hooks.sh` runs the behavior cases alone.
+
+`--strict` fails on warnings, and `--profile directory` adds the subset of the
+plugin directory's checks the CLI can run (README, license, icon). The
+directory's portal runs more checks, plus a security scan, after you push.
+
+CI (`.github/workflows/ci.yml`) runs `scripts/check.sh` and both
+`claude plugin validate` commands, with Claude Code pinned to one version, on
+every push to `main` and every pull request.
 
 ## Commits and branches
 

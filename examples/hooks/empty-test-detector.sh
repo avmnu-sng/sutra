@@ -1,158 +1,103 @@
 #!/usr/bin/env bash
 #
-# empty-test-detector.sh -- OPT-IN PostToolUse hook (non-blocking).
+# empty-test-detector.sh -- opt-in Claude Code PostToolUse hook (non-blocking).
 #
-# Warns when a just-written test file appears to define a test but contains
-# no assertion anywhere. This is a coarse, whole-file heuristic meant as a
-# TEMPLATE you adapt to your language and test framework -- not a turnkey
-# parser. It never blocks a tool call and always exits 0.
+# Warns when a file Claude just wrote looks like a test file that defines a
+# test but contains no assertion anywhere. A coarse, whole-file heuristic: a
+# TEMPLATE to adapt to your language and test framework, not a parser. A file
+# where one test asserts and another does not stays quiet.
 #
-# ---------------------------------------------------------------------------
-# What it does
-# ---------------------------------------------------------------------------
-# Claude Code invokes a PostToolUse hook AFTER a tool runs, passing a JSON
-# event on stdin. For a file-writing tool (Write/Edit/etc.) that JSON carries
-# the path that was written. This script:
+# Input: the PostToolUse payload on stdin. The path comes from
+# tool_input.file_path (Write, Edit) or tool_input.notebook_path (NotebookEdit),
+# read with jq, or with perl's JSON::PP when jq is missing. A git hook gets no
+# payload, so this runs only as a Claude Code hook.
+# Output: on a finding, one JSON object with a systemMessage for the user and
+# additionalContext for Claude. It never blocks and always exits 0: the write
+# has already happened when a PostToolUse hook runs.
 #
-#   1. Reads the JSON from stdin.
-#   2. Extracts the written file path (sed only -- no jq dependency).
-#   3. No-ops unless the path looks like a test file (TEST_FILE_REGEX).
-#   4. If the file looks like it defines a test but no assertion token
-#      (ASSERT_REGEX) appears anywhere in it, emits a JSON systemMessage
-#      warning that names the file.
-#   5. Exits 0 no matter what.
+# Knobs (environment variables, extended regexes):
+#   TEST_FILE_REGEX  matched against the path relative to the project: is this
+#                    a test file? Default: a name that ends in _test.EXT,
+#                    _spec.EXT, .test.EXT or .spec.EXT, or starts with test_
+#                    (foo_test.go, app.test.ts, test_foo.py, foo_spec.rb).
+#   TEST_DEF_REGEX   does the file define a test? Default: def test...,
+#                    func Test..., @Test, it(, test(, describe(, ...
+#   ASSERT_REGEX     does the file contain an assertion? Default: assert,
+#                    expect, require, should, must, check, verify, Fatal,
+#                    Error, Fail, XCTFail.
 #
-# ---------------------------------------------------------------------------
-# Install (opt-in)
-# ---------------------------------------------------------------------------
-# Wire it into your project or user settings.json under hooks.PostToolUse,
-# matching the file-writing tools you care about. Example:
-#
-#   {
-#     "hooks": {
-#       "PostToolUse": [
-#         {
-#           "matcher": "Write|Edit",
-#           "hooks": [
-#             { "type": "command",
-#               "command": "/absolute/path/to/empty-test-detector.sh" }
-#           ]
-#         }
-#       ]
-#     }
-#   }
-#
-# ---------------------------------------------------------------------------
-# Tuning (environment variables)
-# ---------------------------------------------------------------------------
-# Override either regex without editing this file:
-#
-#   TEST_FILE_REGEX  Extended-regex deciding whether a path is a test file.
-#                    Default matches common conventions across languages:
-#                      _test   .test.   test_   spec
-#                    e.g. foo_test.go, app.test.ts, test_foo.py, foo_spec.rb
-#
-#   ASSERT_REGEX     Extended-regex for "this file contains an assertion".
-#                    Default covers common assertion / expectation / fatal
-#                    helpers: assert, expect, require, should, must,
-#                    check, verify, and fail/error-style fatals (t.Fatal,
-#                    t.Error, XCTFail, ...).
-#
-#   TEST_DEF_REGEX   Extended-regex for "this file defines a test". Default
-#                    matches typical test declarations across languages
-#                    (def test..., func Test..., it(, test(, @Test, ...).
-#                    Tune this to cut false positives in your ecosystem.
-#
-# Because the heuristic is whole-file, a file where ONE test asserts and
-# ANOTHER does not will NOT warn. A real per-language version should parse
-# each test body and check assertions per test. Treat this script as the
-# starting scaffold for that.
-#
-# ---------------------------------------------------------------------------
-# Graceful degradation
-# ---------------------------------------------------------------------------
-# Every failure mode -- missing stdin, unparseable JSON, unreadable file,
-# absent tools -- falls through to a clean exit 0 with no output. A hook
-# should never be the reason a test run or edit is disrupted.
-# ---------------------------------------------------------------------------
+# Every failure -- no input, unparseable JSON, unreadable file, no jq or
+# JSON::PP, an invalid regex -- exits 0 with no output.
 
-# Do not let an unexpected error take the hook (and thus the tool call) down.
 set -u
+export LC_ALL=C
 
-# Configurable heuristics. Override via env; defaults below.
-TEST_FILE_REGEX="${TEST_FILE_REGEX:-(_test|\.test\.|(^|/)test_|spec)}"
+TEST_FILE_REGEX="${TEST_FILE_REGEX:-(_test|_spec|\.test|\.spec)\.[^/]+$|(^|/)test_[^/]+$}"
 ASSERT_REGEX="${ASSERT_REGEX:-(assert|expect|require|should|must|check|verify|Fatal|Error|Fail|XCTFail)}"
-TEST_DEF_REGEX="${TEST_DEF_REGEX:-(def[[:space:]]+test|func[[:space:]]+Test|@Test|(^|[^[:alnum:]])(it|test|describe|context|scenario)[[:space:]]*\()}"
+TEST_DEF_REGEX="${TEST_DEF_REGEX:-(def[[:space:]]+test|func[[:space:]]+Test|@Test|(^|[^[:alnum:]_])(it|test|describe|context|scenario)[[:space:]]*\()}"
 
-# Read the whole PostToolUse JSON event from stdin. If nothing is piped in
-# (e.g. run by hand), do not hang -- bail out cleanly.
-if [ -t 0 ]; then
-  exit 0
-fi
-payload="$(cat 2>/dev/null || true)"
-[ -n "${payload}" ] || exit 0
+[[ "" =~ $TEST_FILE_REGEX ]]
+[ "$?" -ne 2 ] || exit 0
 
-# Extract the written file path WITHOUT jq. PostToolUse events expose the
-# path under tool_input (the arguments the tool was called with). Different
-# tools name it differently, so try the common keys in order:
-#   file_path  -> Write/Edit/MultiEdit
-#   path       -> some file tools
-#   notebook_path -> NotebookEdit
-#
-# grep -o pulls the first "key": "value" match; sed peels off the value.
-# This is intentionally forgiving: any miss just yields an empty path and a
-# clean exit below.
-extract_path() {
-  key="$1"
-  printf '%s' "${payload}" \
-    | grep -o "\"${key}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
-    | head -n 1 \
-    | sed -E "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"([^\"]*)\".*/\1/"
+[ -t 0 ] && exit 0
+payload="$(cat 2>/dev/null)"
+[ -n "$payload" ] || exit 0
+
+have_jq=0
+command -v jq >/dev/null 2>&1 && have_jq=1
+
+# fields prints tool_input.file_path, tool_input.notebook_path and cwd from the
+# payload, each NUL-terminated.
+fields() {
+  if [ "$have_jq" = 1 ]; then
+    printf '%s' "$payload" | jq -j '
+      def s(f): (try f catch null) | if type == "string" then split("\u0000") | join("") else "" end;
+      s(.tool_input.file_path), "\u0000", s(.tool_input.notebook_path), "\u0000", s(.cwd), "\u0000"' 2>/dev/null
+  else
+    printf '%s' "$payload" | perl -MJSON::PP -e '
+      my $d = eval { JSON::PP->new->utf8->decode(do { local $/; <STDIN> }) };
+      exit 0 unless ref $d eq "HASH";
+      my $in = ref $d->{tool_input} eq "HASH" ? $d->{tool_input} : {};
+      for my $v ($in->{file_path}, $in->{notebook_path}, $d->{cwd}) {
+        $v = "" if !defined $v || ref $v;
+        utf8::encode($v);
+        $v =~ tr/\0//d;
+        print $v, "\0";
+      }' 2>/dev/null
+  fi
 }
 
-file_path="$(extract_path file_path)"
-[ -n "${file_path}" ] || file_path="$(extract_path path)"
-[ -n "${file_path}" ] || file_path="$(extract_path notebook_path)"
+# emit MESSAGE prints the warning as one JSON object.
+emit() {
+  if [ "$have_jq" = 1 ]; then
+    jq -cn --arg msg "$1" '{systemMessage: $msg, hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $msg}}'
+  else
+    perl -MJSON::PP -e '
+      my $msg = $ARGV[0];
+      utf8::decode($msg);
+      print JSON::PP->new->ascii->canonical->encode({ systemMessage => $msg,
+        hookSpecificOutput => { hookEventName => "PostToolUse", additionalContext => $msg } }), "\n";' -- "$1"
+  fi
+}
 
-# Unescape the two escape sequences that legitimately appear in JSON paths:
-# escaped forward slashes and backslashes. Good enough for filesystem paths.
-file_path="$(printf '%s' "${file_path}" | sed -e 's#\\/#/#g' -e 's#\\\\#\\#g')"
+vals=()
+while IFS= read -r -d '' v; do vals+=("$v"); done < <(fields)
+file="${vals[0]:-}"
+[ -n "$file" ] || file="${vals[1]:-}"
+cwd="${vals[2]:-}"
+[ -n "$file" ] && [ -f "$file" ] && [ -r "$file" ] || exit 0
 
-# No path, or the file is gone / unreadable -> nothing to inspect.
-[ -n "${file_path}" ] || exit 0
-[ -f "${file_path}" ] || exit 0
-[ -r "${file_path}" ] || exit 0
+rel="$file"
+for base in "${CLAUDE_PROJECT_DIR:-}" "$cwd"; do
+  [ -n "$base" ] || continue
+  case "$file" in "$base"/*) rel="${file#"$base"/}"; break ;; esac
+done
+[[ $rel =~ $TEST_FILE_REGEX ]] || exit 0
 
-# Only look at files whose PATH looks like a test file. Everything else is
-# out of scope for this hook.
-printf '%s' "${file_path}" | grep -Eq "${TEST_FILE_REGEX}" || exit 0
+grep -Eq -e "$TEST_DEF_REGEX" -- "$file" 2>/dev/null || exit 0
+grep -Eq -e "$ASSERT_REGEX" -- "$file" 2>/dev/null
+[ "$?" -eq 1 ] || exit 0
 
-# Whole-file scan. Read once; if it is unreadable for any reason, bail.
-contents="$(cat "${file_path}" 2>/dev/null || true)"
-[ -n "${contents}" ] || exit 0
-
-# Does the file even look like it defines a test? If not, stay quiet -- a
-# helpers/fixtures file living under a test path is not a finding.
-printf '%s' "${contents}" | grep -Eq "${TEST_DEF_REGEX}" || exit 0
-
-# Does an assertion token appear ANYWHERE in the file? If yes, assume the
-# file is fine (coarse heuristic -- see the note in the header about
-# per-test scanning).
-if printf '%s' "${contents}" | grep -Eq "${ASSERT_REGEX}"; then
-  exit 0
-fi
-
-# Reaching here: the file looks like a test file, defines at least one test,
-# and contains no recognizable assertion. Emit a non-blocking warning.
-#
-# A JSON object on stdout with a systemMessage surfaces the note to the user
-# without blocking. We keep the message on one line and escape the only
-# characters that matter for a JSON string literal: backslash and
-# double-quote. (Paths rarely contain either, but escape defensively.)
-escaped_path="$(printf '%s' "${file_path}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
-
-printf '{"systemMessage":"empty-test-detector: %s looks like a test file with no assertion (assert/expect/require/should/...). Heuristic is coarse and whole-file; verify manually."}\n' \
-  "${escaped_path}"
-
-# Always succeed. A warning is advisory, never a gate.
+label="$(printf '%s' "$rel" | tr '\001-\037\177' '[?*]')"
+emit "empty-test-detector: $label looks like a test file with no assertion (assert, expect, require, should, ...). The check is coarse and whole-file; verify by hand." 2>/dev/null
 exit 0
