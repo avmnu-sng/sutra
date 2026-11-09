@@ -146,10 +146,10 @@ any `claude -p` run (see Residual risk in `docs/security.md`).
 sutra/
   .claude-plugin/marketplace.json     # the catalog (name: sutra), both plugins
   plugins/sutra/                      # skills plugin: Markdown only
-    .claude-plugin/plugin.json        # the manifest, with listing fields
+    .claude-plugin/plugin.json        # the manifest
     README.md                         # what the plugin holds and touches
     LICENSE                           # the plugin's license (MIT)
-    assets/icon.png                   # the listing icon
+    assets/icon.png                   # the icon the validator finds by path
     skills/<name>/SKILL.md            # invocable methodologies (/sutra:<name>)
     agents/<name>.md                  # subagents (thin dispatchers)
   plugins/sutra-harness/              # harness plugin: depends on sutra

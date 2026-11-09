@@ -8,9 +8,6 @@
   "homepage": "https://github.com/avmnu-sng/sutra",
   "repository": "https://github.com/avmnu-sng/sutra",
   "license": "MIT",
-  "icon": "./assets/icon.png",
-  "documentationUrl": "https://github.com/avmnu-sng/sutra#readme",
-  "supportUrl": "https://github.com/avmnu-sng/sutra/issues",
   "keywords": [
     "agent-kit",
     "claude-code",

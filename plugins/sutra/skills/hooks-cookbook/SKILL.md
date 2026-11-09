@@ -32,7 +32,7 @@ counts as a reply only when it is one JSON object and nothing else. Exit 2 is
 a blocking error whose effect depends on the event, with stderr as its
 message. Any other code is a non-blocking error: the flow proceeds.
 
-Per the hooks reference (https://code.claude.com/docs/en/hooks):
+Per the Claude Code hooks reference (https://code.claude.com/docs/en/hooks):
 
 | Event | Can it stop something? | How | `additionalContext` |
 |---|---|---|---|
@@ -54,73 +54,11 @@ outright, so an advisory hook never sets it.
 
 ## 2. The fail-open skeleton
 
-Every hook starts the same way. Copy this shape; replace steps 2-5.
-
-```bash
-#!/usr/bin/env bash
-set -u   # not -e: an ordinary nonzero must not abort the hook mid-run
-
-# 0. No stdin (run by hand) or an empty payload: nothing to check.
-[ -t 0 ] && exit 0
-payload="$(cat 2>/dev/null)" || exit 0
-[ -n "$payload" ] || exit 0
-
-# 1. Pick a JSON tool: jq, else perl's core JSON::PP, else a silent no-op.
-if command -v jq >/dev/null 2>&1; then json=jq
-elif perl -MJSON::PP -e 1 >/dev/null 2>&1; then json=perl
-else exit 0
-fi
-
-# json_get a.b prints that payload field as text; nothing when absent.
-json_get() {
-  if [ "$json" = jq ]; then
-    printf '%s' "$payload" |
-      jq -r --arg p "${1}" 'getpath($p | split("."))? | scalars | values' 2>/dev/null
-  else
-    printf '%s' "$payload" | perl -MJSON::PP -e '
-      my $v = eval { JSON::PP->new->utf8->decode(do { local $/; <STDIN> }) };
-      $v = ref $v eq "HASH" ? $v->{$_} : undef for split /\./, $ARGV[0];
-      $v = $v ? "true" : "false" if JSON::PP::is_bool($v);
-      if (defined $v && !ref $v) { utf8::encode($v); print $v }' -- "${1}" 2>/dev/null
-  fi
-}
-
-# reply KEY VALUE... prints one JSON object; a dotted KEY nests.
-reply() {
-  if [ "$json" = jq ]; then
-    jq -nc '$ARGS.positional as $a | reduce range(0; $a | length; 2) as $i
-      ({}; setpath($a[$i] | split("."); $a[$i + 1]))' --args -- "$@"
-  else
-    perl -MJSON::PP -e '
-      my %o;
-      while (my ($k, $v) = splice @ARGV, 0, 2) {
-        my @path = split /\./, $k;
-        my $leaf = pop @path;
-        my $h = \%o;
-        $h = $h->{$_} //= {} for @path;
-        utf8::decode($v);
-        $h->{$leaf} = $v;
-      }
-      print JSON::PP->new->ascii->canonical->encode(\%o), "\n";' -- "$@"
-  fi
-}
-
-# 2. Early-return unless THIS event is relevant. Cheapest test first.
-file="$(json_get tool_input.file_path)"
-case "$file" in *.rb|*.go|*.ts) ;; *) exit 0 ;; esac
-[ -f "$file" ] || exit 0
-
-# 3. The checker is absent? No-op: never block on a tooling gap.
-command -v mychecker >/dev/null 2>&1 || exit 0
-
-# 4. Run the checker. Clean result: succeed silently.
-report="$(mychecker "$file" 2>&1)" && exit 0
-
-# 5. Translate the failure into a reply (an advisory to the user here).
-reply systemMessage "mychecker flagged $file:
-$(printf '%s\n' "$report" | tail -n 3)"
-exit 0
-```
+Every hook starts the same way. Copy the shape in
+[reference/skeleton.md](reference/skeleton.md) and replace steps 2-5: it reads
+the payload, picks a JSON tool, defines `json_get` and `reply`, returns early
+unless the event is relevant, runs the checker, and translates a failure into
+a reply.
 
 Why each guard exists:
 
@@ -154,7 +92,8 @@ lost work, so run a rule in warn mode until its precision is proven.
 Each recipe replaces steps 2-5 of the skeleton; the code is in
 [reference/recipes.md](reference/recipes.md). Read the one that fits:
 
-- **A. Fail-open guard wrapper** -- the skeleton itself; nothing more to read.
+- **A. Fail-open guard wrapper** -- the skeleton itself, in
+  [reference/skeleton.md](reference/skeleton.md).
 - **B. Post-edit CI parity** (`PostToolUse`, advisory) -- lint only the
   edited file, or run a formatter and tell Claude.
 - **C. Newly-introduced-only guard** (`PostToolUse`, advisory) -- flag a
@@ -181,20 +120,18 @@ even one that only warns at the wrong moment, is a surprise.
   project's checks when code changed and no check ran since. It never fires
   while `stop_hook_active` is true, never twice for the same edits, never when
   Claude ends on a question, and `SUTRA_GATE=off` turns it off. It never
-  blocks a tool call and makes no network calls. This plugin, `sutra`, ships
-  no hooks.
+  blocks a tool call and stays local. This plugin, `sutra`, ships no hooks.
 - **Blocking or mutating hooks are opt-in.** The user wires them in their own
   `settings.json`, or the hook does nothing unless a switch the user sets
   turns it on.
-- **Quote the path and set a timeout.** Shell form quotes the path
-  variable: `"\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check.sh"` in project
-  settings, and the plugin-root variable the same way in a plugin (the exact
-  line is under Wiring in [reference/recipes.md](reference/recipes.md)), with
-  `"timeout": 10`. The default is 600 seconds (30 on `UserPromptSubmit`), and
-  a hung hook holds the session that long.
-- **No network calls.** A hook runs unattended on every matching event: a
-  fetch, push, or API call would act without a prompt, add latency, and fail
-  offline. Read local or cached state, as recipe E reads the last fetch.
+- **Quote the path and set a timeout.** Quote the path variable in the command
+  so a path with spaces holds together, and set `"timeout": 10` (the exact
+  lines are under Wiring in [reference/recipes.md](reference/recipes.md)). The
+  default is 600 seconds (30 on `UserPromptSubmit`), and a hung hook holds the
+  session that long.
+- **Stay local.** A hook runs unattended on every matching event, so anything
+  remote would act without a prompt, add latency, and fail offline. Read local
+  or cached state, as recipe E does.
 - **One wiring per script.** Never register the same script as both a git
   `pre-commit` and a Claude Code hook; it would run twice.
 - **Templates.** `examples/hooks/` in the sutra repository
@@ -219,4 +156,4 @@ even one that only warns at the wrong moment, is a surprise.
 - [ ] "Newly introduced" checks compare against `HEAD`.
 - [ ] Blocking is opt-in, never on by default.
 - [ ] The hook command quotes its path and sets a `timeout`, and the hook
-      makes no network calls.
+      stays local.

@@ -19,14 +19,15 @@ reads can try to steer it. To assess a specific threat, read
 
 An agent that holds private data (source, credentials, private repositories),
 untrusted content (anything an outsider can write), and a way to communicate
-externally (`curl`, WebFetch, `git push`, an MCP tool that posts) can be
-tricked into sending the data out. Guardrails that try to spot injected text
-do not reliably stop it, so remove one leg before the session starts:
+externally (a network command, WebFetch, `git push`, an MCP tool that posts)
+can be tricked into sending the data out. Guardrails that try to spot injected
+text do not reliably stop it, so remove one leg before the session starts:
 
 - **No egress:** deny `WebFetch(domain:*)` and run the sandbox (section 5):
   WebFetch and Bash then reach no host in any mode (v2.1.186 or later); denying
-  WebFetch alone still leaves `curl`. Deny every MCP tool whose server can reach
-  the network, read and search tools included; click no link the agent wrote.
+  WebFetch alone still leaves every other network command. Deny every MCP tool
+  whose server can reach the network, read and search tools included; click no
+  link the agent wrote.
 - **No private data:** use a checkout or container with no secrets and a
   token scoped to the task.
 - **No untrusted input:** the session does not read issues, pages, or email.
@@ -48,7 +49,7 @@ install and after each update. Run scripts and tool calls that touch external
 web services in a VM. With `sutra-harness` installed, its untrusted-content
 card arrives once per session, after the first WebFetch or WebSearch (again
 after `/clear` or a compaction), under every profile unless
-`SUTRA_SECURITY=off`; not for `curl` or MCP output.
+`SUTRA_SECURITY=off`; not for Bash or MCP output.
 
 ## 3. Hidden characters
 
@@ -70,25 +71,9 @@ NUL in an instruction file is reported); and runs under every profile unless
 you set `SUTRA_SECURITY=off`. It does not scan Bash or Grep output, web pages,
 or MCP tool text; save a copy and scan that. A hit in an instruction file makes
 the whole file untrusted until the user has seen the decoded text; in a file
-Claude wrote, remove it unless the content needs it. To list every hit:
-
-```sh
-scan='use Encode (); for my $f (@ARGV) { open(my $fh, "<:raw", $f) or do { warn "$f: $!\n"; next };
-  read($fh, my $head, 8192); if (index($head, "\0") >= 0) { close $fh; next } seek($fh, 0, 0);
-  while (my $raw = <$fh>) { my $l = Encode::decode("UTF-8", $raw); $l =~ s/\A\x{FEFF}// if $. == 1;
-    printf "%s:%d: U+%04X\n", $f, $., ord ${1} while $l =~ /([\x{061C}\x{180E}\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}-\x{2064}\x{2066}-\x{2069}\x{FEFF}\x{E0000}-\x{E007F}])/g }
-  close $fh }'
-perl -e "$scan" -- "$file"
-git ls-files -z | xargs -0 perl -e "$scan" --
-find "$dir" -type f -print0 | xargs -0 perl -e "$scan" --
-```
-
-No output means none of those characters; a file with a NUL in its first 8 KiB
-is skipped as binary. Default-ignorable characters outside that set, such as
-variation selectors (U+FE00-U+FE0F, U+E0100-U+E01EF), are missed; use `od -c`.
-The three-argument `open` treats a name only as a file name; never scan with
-`perl -n`, `perl -p`, or `while (<>)`, whose two-argument `open` runs a name
-ending in `|` as a shell command. `--` keeps a leading `-` from being a switch.
+Claude wrote, remove it unless the content needs it. To list every hit, run the
+scan in [reference/commands.md](reference/commands.md); no output means none
+of those characters.
 
 ## 4. Vet a plugin, MCP server, or skill before you install it
 
@@ -107,11 +92,8 @@ Installing enables it unless its manifest or marketplace entry sets
 3. Read what instructs: every `SKILL.md`, agent, command, and output style,
    inline `commands`, the `agent` setting, the scripts a skill runs, and each
    MCP tool description; run the section 3 scan.
-4. Explain every red flag or do not install: package launchers that resolve an
-   unpinned version at run time; a downloaded script fed straight into a shell
-   interpreter, directly or after decoding; reads of `~/.ssh`, `~/.aws`,
-   `.env`, or tokens; unexplained network calls; writes to settings, hooks,
-   CI, or memory files; tool descriptions with instructions.
+4. Explain every red flag listed in
+   [reference/commands.md](reference/commands.md), or do not install.
 5. Turn auto-update off for its marketplace, or install from an entry pinned to
    a commit SHA or archive `sha256`; pin an MCP server's package version. With
    auto-update on, reviewed files can change on disk: re-review each update.
@@ -121,15 +103,17 @@ Installing enables it unless its manifest or marketplace entry sets
 - **Deny secrets to the file tools:** `Read(./.env)` and `Read(./secrets/**)`
   in `permissions.deny` also block `cat`-style Bash commands and redirects, but
   not `grep -r` or scripts, so add the paths to `sandbox.filesystem.denyRead`.
-  Bash rules match command text, not the program (`Bash(curl *)` misses
-  `/usr/bin/curl`), so keep real secrets off machines running untrusted work.
+  Bash rules match command text, not the program (a rule on a bare command name
+  misses its absolute path), so keep real secrets off machines running
+  untrusted work.
 - **Exact allow rules:** `Bash(npm run lint)`, not `Bash(npm run *)`, and only
   in trusted repositories: it runs whatever `package.json` says (section 7).
-  `curl` and `wget` are not auto-approved by default; keep it that way.
+  Network commands are not auto-approved by default; keep it that way.
 - **No prefix that runs arbitrary programs:** `Bash(make:*)` in an untrusted
-  repository, `Bash(git *)` (`git -c` runs a program you name), `Bash(npx:*)`
-  and `Bash(docker exec *)` (run any command), `Bash(rg:*)` (`rg --pre=CMD`
+  repository, `Bash(git *)` (`git -c` runs a program you name), a package launcher's
+  prefix and `Bash(docker exec *)` (run any command), `Bash(rg:*)` (`rg --pre=CMD`
   runs CMD per file). `Bash(x:*)` is the same rule as `Bash(x *)`.
+  Concrete examples are in [reference/commands.md](reference/commands.md).
 - **Sandbox for untrusted work:** `/sandbox` or `sandbox.enabled`. Bash and
   its child processes can then write only to the working, temp, and added
   directories and reach only allowed domains, none by default; another host

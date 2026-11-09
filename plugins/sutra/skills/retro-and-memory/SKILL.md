@@ -45,7 +45,7 @@ session re-runs the probe instead of trusting your prose.
   (run at close)."
 
 - Bad: "The new endpoint works."
-- Good: "New endpoint works -- `curl -s localhost:8080/health` -> `{"ok":true}`;
+- Good: "New endpoint works -- `task smoke:health` -> `{"ok":true}`;
   drove the full create->read flow, not just the unit test."
 
 Rules:

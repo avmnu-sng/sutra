@@ -42,6 +42,45 @@ for you or Claude to run; none runs on its own. The subagents can only read.
 skill and agent with its context cost: about 1,600 tokens of listings in every
 session, and each skill's body only when it is used.
 
+## Examples
+
+Run a skill by name with the task after it, or describe the task and let
+Claude pick the skill from its description:
+
+- `/sutra:architecture-review Review the payments service: trace one request
+  end to end and tell me what breaks first at 10x load.` Claude traces the real
+  code path, works through 2x, 5x, and 10x with numbers, and ranks each fix by
+  its return.
+- `/sutra:test-authoring Cover the edge cases in the date parser, and show which
+  assertion fails if the parser regresses.` Claude reads the source of truth
+  first, then writes tests that fail when the behavior breaks.
+- `/sutra:debugging The nightly export hangs since yesterday's deploy; find out
+  why.` Claude reproduces the problem, narrows it with a bisect, and proves the
+  mechanism before it calls the bug fixed.
+- `/sutra:commit-craft Write the commit message for my staged changes.` Claude
+  writes a message a future reader of `git blame` can use.
+
+## Data
+
+This plugin collects no data. It is Markdown instructions and read-only
+subagent definitions, so it stores nothing and sends nothing anywhere. What
+Claude does while following a skill happens under your own Claude account and
+your permission settings.
+
+## Troubleshooting
+
+- **A skill does not appear.** Run `/reload-plugins` or start a new session.
+- **Which version do I have?** `claude plugin list` shows it.
+- **A subagent or skill misbehaves.** Skills and subagents are plain Markdown:
+  read the one involved under `skills/` or `agents/` in this plugin to see what
+  it told Claude to do.
+
+## Support
+
+Report a problem or ask a question in the repository's
+[issue tracker](https://github.com/avmnu-sng/sutra/issues). To report a security
+issue, follow `SECURITY.md` in the repository.
+
 ## The harness
 
 The companion plugin `sutra-harness`, from the same marketplace, adds the
@@ -63,8 +102,8 @@ another marketplace with `claude plugin uninstall sutra@<marketplace>`, or
 disable one synced from claude.ai (`sutra@synced`) in the `/plugin` Installed
 tab.
 
-Full documentation, the threat model, and the release notes live in the
-repository: https://github.com/avmnu-sng/sutra
+The [full documentation](https://github.com/avmnu-sng/sutra#readme), the threat
+model, and the release notes live in the repository.
 
 ## License
 

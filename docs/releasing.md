@@ -86,14 +86,25 @@ broken tree.
    again. `check_manifests` must report `one shared version: X.Y.Z`; it fails
    when one `plugin.json` was not bumped or the changelog was not rolled.
 
-6. **Commit and land it.** One commit for the bump plus the changelog roll,
-   with an imperative subject and a conventional prefix (e.g.
-   `chore: release vX.Y.Z`). Land it on `main`, then confirm
+6. **Commit on a release branch and validate it in the portal.** One commit
+   for the bump plus the changelog roll, with an imperative subject and a
+   conventional prefix (e.g. `chore: release vX.Y.Z`). Push the branch. The
+   local commands above do not run the directory's checks: `claude plugin
+   validate` checks only that files are well-formed. In the developer portal
+   choose **Submit new**, then **Plugin bundle**, enter the repository, the
+   release branch, and the plugin path `plugins/sutra`, and select **Validate**.
+   Do not submit: the existing submission stays on `main`. Fix anything marked
+   Blocks on the branch, re-run the step 5 gate, and select **Re-validate**.
+   Holds and notes may remain; a reviewer clears a hold. The directory's policy
+   review and security scan run only after the commit reaches the tracked
+   branch, which step 11 checks.
+
+7. **Land it on `main`.** Merge the release branch, then confirm
    `.github/workflows/ci.yml` is green on that exact SHA in all three of its
    jobs, `checks`, `hook-tests-macos`, and `plugin-validate`. Green on "a
    recent run" is not green on this SHA.
 
-7. **Tag `main`.** Tag the gated SHA:
+8. **Tag `main`.** Tag the gated SHA:
 
    ```
    git tag vX.Y.Z
@@ -108,13 +119,13 @@ broken tree.
    Sutra, also run `claude plugin tag` in each plugin folder, which creates
    `sutra--vX.Y.Z` and `sutra-harness--vX.Y.Z` after checking the manifest.
 
-8. **Push the tag.**
+9. **Push the tag.**
 
    ```
    git push origin vX.Y.Z
    ```
 
-9. **Verify from a clean install.** In a throwaway environment (or after
+10. **Verify from a clean install.** In a throwaway environment (or after
    `/plugin marketplace remove sutra`), install from scratch and confirm the
    new version lands for both plugins:
 
@@ -129,13 +140,15 @@ broken tree.
    `X.Y.Z` for both. If it still shows the old version, step 3 was skipped or
    not pushed.
 
-10. **Re-check the directory listing.** Only `sutra` is submitted to
+11. **Re-check the directory listing.** Only `sutra` is submitted to
     Anthropic's plugin directory; `sutra-harness` ships hooks, which the
     directory accepts only from Verified organizations. On `sutra`'s page in
     the developer portal (claude.ai/directory/manage), select **Check for new
     commits** so the directory scans the tagged commit now rather than at its
     next scheduled check. The portal runs checks and a security scan the CLI
-    cannot; read the Versions tab and fix anything marked Blocks.
+    cannot; read the Versions tab and fix anything marked Blocks. When the
+    version passes, select **Publish**, unless the plugin publishes new
+    versions automatically.
 
 ## The listing icon
 
@@ -149,8 +162,14 @@ rsvg-convert -w 512 -h 512 docs/assets/sutra-icon.svg -o plugins/sutra/assets/ic
 cp plugins/sutra/assets/icon.png plugins/sutra-harness/assets/icon.png
 ```
 
-The portal takes the icon from the first saved or submitted version only, so a
-later change to the file has to be set in the developer portal as well.
+The directory reads the listing fields (`icon`, `documentationUrl`,
+`supportUrl`, `privacyPolicyUrl`, and `termsOfServiceUrl`) from `plugin.json`
+only when a plugin is first submitted, and reports them as unknown keys on
+every later scan, so `plugins/sutra/.claude-plugin/plugin.json` does not set
+them. The validator finds the icon at its conventional path; that file can set
+the listing icon only when the plugin is first submitted. To change a recorded
+listing detail, use **Contact Anthropic** on the plugin's page in the developer
+portal.
 
 ## Do NOT
 

@@ -6,6 +6,37 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Removed the `skills:` frontmatter key from `architecture-reviewer` and
+  `code-verifier`. The plugin directory refuses frontmatter keys outside its
+  list from an organization that is not Verified. Each agent now reads its
+  skill file directly and falls back to the summary in its own text.
+- Removed `icon`, `documentationUrl`, and `supportUrl` from `sutra`'s
+  `plugin.json`. The directory reads them only at the first submission and
+  reports them on every later scan. `claude plugin validate` still finds the
+  icon at `assets/icon.png`; the listing icon is set at the first submission
+  or through **Contact Anthropic**.
+
+### Changed
+
+- `hooks-cookbook` moves its hook skeleton to `reference/skeleton.md`, and
+  `agent-security` moves its scan, red-flag list, and permission examples to
+  `reference/commands.md`; each `SKILL.md` links to them. Neither `SKILL.md`
+  now names a download tool or package launcher or reads an environment
+  variable.
+- The `retro-and-memory` endpoint example uses a task-runner probe.
+
+### Added
+
+- The `sutra` README has example prompts, a data statement, troubleshooting,
+  and support links, as the directory policy requires.
+- `directory-policy` in `scripts/check.sh` allows only frontmatter keys that
+  have passed a directory scan, keeps launcher names and environment reads out
+  of entry files, and refuses the listing keys.
+- `docs/releasing.md` validates each release branch in the portal before it
+  merges, because the local commands do not run the directory's checks.
+
 ## [0.3.0] - 2026-11-07
 
 Sutra is now two plugins, so that its skills can be listed in Anthropic's
