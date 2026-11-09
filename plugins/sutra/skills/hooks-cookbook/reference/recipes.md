@@ -1,7 +1,7 @@
 # Hooks cookbook: recipes
 
 Each recipe is a pattern plus a sketch built on the fail-open skeleton in
-`SKILL.md` section 2. Keep the skeleton's steps 0-1 (`set -u`, the stdin
+`reference/skeleton.md`. Keep the skeleton's steps 0-1 (`set -u`, the stdin
 guard, the choice of jq or `JSON::PP`, `json_get`, `reply`) and replace steps
 2-5 with the recipe. Every value reaches stdout through `reply`, never through
 a JSON template. Runnable, tunable templates live in `examples/hooks/` in the
@@ -21,7 +21,7 @@ the same way.
 
 ## A. Fail-open guard wrapper
 
-The skeleton in `SKILL.md` section 2 *is* this recipe: parse, early-return
+The skeleton in `reference/skeleton.md` *is* this recipe: parse, early-return
 unless relevant, run the checker, warn or block on failure. Every recipe below
 is that shape with step 2 (relevance) and steps 4-5 (checker and verdict)
 specialized. Start there.

@@ -324,6 +324,9 @@ check_directory_policy() {
     my $pm = qr/(?:\A|\/)(?:package(?:-lock)?\.json|npm-shrinkwrap\.json|pnpm-(?:workspace|lock)\.ya?ml|yarn\.lock|\.yarnrc(?:\.ya?ml)?|\.npmrc|bun\.lockb?|bunfig\.toml|deno\.(?:json|jsonc|lock)|composer\.(?:json|lock)|bower\.json|pubspec\.ya?ml|environment\.ya?ml|[^\/]*(?:requirements|constraints)[^\/]*\.txt|requirements\/[^\/]+\.txt|pipfile(?:\.lock)?|poetry\.lock|uv\.lock)\z/i;
     my $runs = qr/\A(?:(?:hooks|workflows|bin|monitors)\/|(?:\.mcp|\.lsp|settings)\.json\z)/i;
     my $device = qr/\A(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.[^.]*)?\z/i;
+    my $component = qr/\A(?:skills\/[^\/]+\/SKILL|agents\/.+|commands\/.+|output-styles\/.+)\.md\z/i;
+    my $entry = qr/\A(?:skills\/[^\/]+\/SKILL\.md|agents\/.+\.md|commands\/.+\.md|output-styles\/.+\.md|README\.md)\z/i;
+    my %scanned = map { $_ => 1 } qw(name description tools disable-model-invocation);
     my ($count, %folded) = (0);
     local $/ = "\0";
     while (my $name = <STDIN>) {
@@ -367,6 +370,26 @@ check_directory_policy() {
         while ($fm =~ /^(hooks|mcpServers)[ \t]*:/mg) {
           print "$name: frontmatter declares $1, which runs code\n";
         }
+        if ($rel =~ $component) {
+          for my $line (split /\r?\n/, $fm) {
+            next if $line =~ /^[ \t]*(?:#.*)?$/ || $line =~ /^[ \t]/;
+            if ($line =~ /^([A-Za-z][\w-]*)[ \t]*:[ \t]*(.*)$/) {
+              my ($key, $value) = ($1, $2);
+              print "$name: frontmatter key $key has not passed a directory scan; the directory refuses keys outside its unpublished list\n" unless $scanned{$key};
+              print "$name: frontmatter key $key holds a list or map, and the directory takes only text here\n" if $value eq "" || $value =~ /^[\[{]/;
+            } else {
+              print "$name: frontmatter line is not a key and a value: $line\n";
+            }
+          }
+        }
+      }
+      if ($rel =~ $entry) {
+        print "$name: names $1, which the fetch-and-run scan of the directory can flag\n" if $data =~ /\b(curl|wget|npx|uvx|bunx|pipx|dlx|uv\s+run)\b/i;
+        while ($data =~ /\$\{?([A-Z][A-Z0-9_]{2,})\}?/g) {
+          next if $1 =~ /\A(?:CLAUDE_PLUGIN_ROOT|CLAUDE_SKILL_DIR|ARGUMENTS)\z/;
+          print "$name: reads \$$1, which the directory can treat as a credential from the environment\n";
+          last;
+        }
       }
       print "$name: runs a shell command when it loads (an inline !`...` or a ```! block)\n"
         if $rel =~ /\A(?:skills\/[^\/]+\/SKILL|commands\/.+)\.md\z/i && ($data =~ /(?:^|\s)!`/m || $data =~ /^[ \t]*```!/m);
@@ -377,8 +400,8 @@ check_directory_policy() {
   collect "$out"
   while IFS= read -r line; do
     problem "$dir/.claude-plugin/plugin.json: $line"
-  done < <(jq -r '(keys_unsorted - ["$schema", "name", "displayName", "version", "description", "author", "homepage", "repository", "license", "keywords", "icon", "documentationUrl", "supportUrl", "privacyPolicyUrl", "termsOfServiceUrl", "skills", "agents", "outputStyles", "defaultEnabled", "dependencies", "metadata", "userConfig"])[]
-    | "key \(.) is outside the allowlist in check_directory_policy, which leaves out every key that can run code"' "$dir/.claude-plugin/plugin.json" 2>&1)
+  done < <(jq -r '(keys_unsorted - ["$schema", "name", "displayName", "version", "description", "author", "homepage", "repository", "license", "keywords", "skills", "agents", "outputStyles", "defaultEnabled", "dependencies", "metadata", "userConfig"])[]
+    | "key \(.) is outside the allowlist in check_directory_policy, which leaves out every key that can run code and the listing keys (icon and the *Url fields): the directory reads those only at the first submission and reports them on every later scan"' "$dir/.claude-plugin/plugin.json" 2>&1)
   for f in README.md LICENSE; do
     regular "$dir/$f" || problem "$dir/$f is missing"
   done
@@ -388,7 +411,7 @@ check_directory_policy() {
     grep -Eq '(^|[[:space:]])(export-ignore|export-subst|filter=)' "$f" &&
       problem "$f: export-ignore, export-subst, or filter changes the files the directory fetches"
   done < <(files .gitattributes '*/.gitattributes')
-  finish directory-policy "$count files under $dir: allowed types and names only, complete images, every file under 5 MiB, UTF-8 text without NUL or #!, no hook, workflow, server, shell injection, or package manager file; manifest keys allowlisted; README (40 words outside code) and LICENSE present"
+  finish directory-policy "$count files under $dir: allowed types and names only, complete images, every file under 5 MiB, UTF-8 text without NUL or #!, no hook, workflow, server, shell injection, or package manager file; frontmatter and manifest keys allowlisted; entry files free of launcher names and environment reads; README (40 words outside code) and LICENSE present"
 }
 
 check_workflows() {

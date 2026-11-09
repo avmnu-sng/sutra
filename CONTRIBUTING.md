@@ -85,7 +85,14 @@ line per check:
   `mcpServers`, and no skill or command that runs a shell command when it
   loads (an inline ``!`...` `` or a ```` ```! ```` block); no name holds a
   colon, ends in a dot or space, is a reserved device name, or differs from
-  another only by case; its `plugin.json` declares no key that can run code;
+  another only by case; skill and agent frontmatter uses only `name`,
+  `description`, and `tools`, each holding text, and
+  `disable-model-invocation`, holding `true`; skill, agent, command, and README
+  entry files name no package launcher or download tool and read no environment
+  variable other than `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_SKILL_DIR}`, or
+  `$ARGUMENTS`; its
+  `plugin.json` declares no key that can run code and no listing key (`icon`
+  or a `*Url` field);
   its `README.md` (at least 40 words outside code blocks) and `LICENSE`
   exist; and no `.gitattributes` uses `export-ignore`, `export-subst`, or
   `filter`.
@@ -104,8 +111,10 @@ While working on the hook, `bash tests/hooks.sh` runs the behavior cases
 alone.
 
 `--strict` fails on warnings, and `--profile directory` adds the subset of the
-plugin directory's checks the CLI can run (README, license, icon). The
-directory's portal runs more checks, plus a security scan, after you push.
+plugin directory's checks the CLI can run (README, license, icon, and manifest
+shape). The directory's policy review and security scan run only in the portal,
+so `directory-policy` encodes what past scans reported, and a release is
+scanned on its branch before it merges (`docs/releasing.md`).
 
 CI (`.github/workflows/ci.yml`) runs `scripts/check.sh`, the hook tests under
 macOS bash 3.2, and the `claude plugin validate` commands, with Claude Code
