@@ -6,6 +6,8 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-09
+
 ### Changed
 
 - `hooks-cookbook/SKILL.md` no longer carries the link to the hooks reference,
