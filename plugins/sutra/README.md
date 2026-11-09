@@ -83,8 +83,7 @@ issue, follow `SECURITY.md` in the repository.
 
 ## The harness
 
-The companion plugin `sutra-harness`, from the same marketplace, adds the
-parts that run automatically: a layered operating contract at session start,
+The companion plugin `sutra-harness` adds the parts that run automatically: a layered operating contract at session start,
 short rule cards when they apply, hidden-Unicode warnings, a compaction brief,
 a verify-before-stop nudge under the strict profile, and the
 `/sutra-harness:build-orchestrator` workflow. It runs a Bash hook script, so

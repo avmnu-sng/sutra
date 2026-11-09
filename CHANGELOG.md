@@ -6,6 +6,30 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- `hooks-cookbook/SKILL.md` no longer carries the link to the hooks reference,
+  and it and `agent-security/SKILL.md` no longer name the harness's off
+  switches, to address a plugin directory hold for using a credential from the
+  user's machine. The plugin reads no credential. The switches stay documented
+  in the `sutra-harness` README, and the link in
+  `agent-security/reference/threats.md`.
+- The commit-guard recipes in `hooks-cookbook/reference/recipes.md` take the
+  denylist from their `deny=` line and no longer read an override from the
+  environment.
+- `agent-security/reference/commands.md` describes package launchers and
+  download tools by category instead of by command name, because the directory
+  warns about those commands in any text it reads. It also describes credential
+  files by kind instead of by path.
+- `scaffold-execution-plan`, `multi-session-build`, `agent-docs-architecture`,
+  and the `sutra` README no longer imply that a directory install includes
+  `sutra-harness` or a sample `examples/setup.yaml`.
+- `directory-policy` in `scripts/check.sh` keeps launcher and download tool
+  names out of every text file in `plugins/sutra`, not only entry files, and
+  refuses ICO images, which the checklist holds for a reviewer.
+- `docs/releasing.md` covers Warning results, says how to tell whether portal
+  Validate reports holds, and says that a merge to `main` starts a new scan.
+
 ## [0.3.1] - 2026-11-09
 
 ### Fixed

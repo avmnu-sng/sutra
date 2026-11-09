@@ -308,6 +308,7 @@ bad_paths='
 # Verified, any hook, workflow script, or file outside Markdown, text, JSON,
 # YAML, and PNG/JPEG/GIF/WebP/ICO images. plugins/sutra is the plugin submitted
 # there; everything that runs on its own lives in plugins/sutra-harness.
+# The checklist still holds an .ico for a reviewer, so this gate rejects ICO too.
 check_directory_policy() {
   local dir=plugins/sutra out scan line words f
   scan='
@@ -317,7 +318,7 @@ check_directory_policy() {
     my $dir = shift;
     my %head = (
       png => qr/\A\x89PNG\r\n\x1a\n/, jpg => qr/\A\xff\xd8\xff/, jpeg => qr/\A\xff\xd8\xff/,
-      gif => qr/\AGIF8[79]a/, webp => qr/\ARIFF.{4}WEBP/s, ico => qr/\A\x00\x00\x01\x00/,
+      gif => qr/\AGIF8[79]a/, webp => qr/\ARIFF.{4}WEBP/s,
     );
     my %tail = (png => qr/IEND\xaeB`\x82\z/, jpg => qr/\xff\xd9\z/, jpeg => qr/\xff\xd9\z/, gif => qr/\x3b\z/);
     my $text = qr/\.(?:md|markdown|txt|json|ya?ml)\z|(?:\A|\/)(?:LICENSE|LICENCE|COPYING|NOTICE|README|\.gitignore)\z/i;
@@ -357,13 +358,14 @@ check_directory_policy() {
         next;
       }
       if ($rel !~ $text) {
-        print "$name: not Markdown, text, JSON, YAML, or a PNG, JPEG, GIF, WebP, or ICO image\n";
+        print "$name: not Markdown, text, JSON, YAML, or a PNG, JPEG, GIF, or WebP image\n";
         next;
       }
       print "$name: starts with #!\n" if $data =~ /\A(?:\xef\xbb\xbf)?#!/;
       print "$name: holds a NUL byte\n" if index($data, "\0") >= 0;
       my $copy = $data;
       print "$name: not UTF-8\n" unless eval { Encode::decode("UTF-8", $copy, Encode::FB_CROAK()); 1 };
+      print "$name: names $1, and the directory flags a download-and-run command in any text it reads\n" if $data =~ /\b(curl|wget|npx|pnpx|uvx|bunx|pipx|(?-i:dlx)|uv\s+(?:tool\s+)?run|npm\s+exec|bun\s+x)\b/i;
       next unless $rel =~ /\.md\z/i;
       if ($data =~ /\A(?:\xef\xbb\xbf)?---\r?\n(.*?)^---\r?$/ms) {
         my $fm = $1;
@@ -384,7 +386,6 @@ check_directory_policy() {
         }
       }
       if ($rel =~ $entry) {
-        print "$name: names $1, which the fetch-and-run scan of the directory can flag\n" if $data =~ /\b(curl|wget|npx|uvx|bunx|pipx|dlx|uv\s+run)\b/i;
         while ($data =~ /\$\{?([A-Z][A-Z0-9_]{2,})\}?/g) {
           next if $1 =~ /\A(?:CLAUDE_PLUGIN_ROOT|CLAUDE_SKILL_DIR|ARGUMENTS)\z/;
           print "$name: reads \$$1, which the directory can treat as a credential from the environment\n";
@@ -411,7 +412,7 @@ check_directory_policy() {
     grep -Eq '(^|[[:space:]])(export-ignore|export-subst|filter=)' "$f" &&
       problem "$f: export-ignore, export-subst, or filter changes the files the directory fetches"
   done < <(files .gitattributes '*/.gitattributes')
-  finish directory-policy "$count files under $dir: allowed types and names only, complete images, every file under 5 MiB, UTF-8 text without NUL or #!, no hook, workflow, server, shell injection, or package manager file; frontmatter and manifest keys allowlisted; entry files free of launcher names and environment reads; README (40 words outside code) and LICENSE present"
+  finish directory-policy "$count files under $dir: allowed types and names only, complete images, every file under 5 MiB, UTF-8 text without NUL or #!, no hook, workflow, server, shell injection, or package manager file; frontmatter and manifest keys allowlisted; text free of launcher and download tool names; entry files free of uppercase variable reads; README (40 words outside code) and LICENSE present"
 }
 
 check_workflows() {

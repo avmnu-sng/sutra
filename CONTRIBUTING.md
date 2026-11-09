@@ -78,7 +78,7 @@ line per check:
   absolute path, command substitution, or variable other than a braced
   `${CLAUDE_PLUGIN_ROOT}` in a `hooks.json` command.
 - **directory-policy:** `plugins/sutra` holds only Markdown, text, JSON,
-  YAML, and complete PNG, JPEG, GIF, WebP, or ICO images, each file under 5
+  YAML, and complete PNG, JPEG, GIF, or WebP images, each file under 5
   MiB; every text file is UTF-8 with no NUL byte and does not start with
   `#!`; there is no hook, workflow, `bin/`, server configuration, or package
   manager file, no Markdown frontmatter that declares `hooks` or
@@ -87,10 +87,10 @@ line per check:
   colon, ends in a dot or space, is a reserved device name, or differs from
   another only by case; skill and agent frontmatter uses only `name`,
   `description`, and `tools`, each holding text, and
-  `disable-model-invocation`, holding `true`; skill, agent, command, and README
-  entry files name no package launcher or download tool and read no environment
-  variable other than `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_SKILL_DIR}`, or
-  `$ARGUMENTS`; its
+  `disable-model-invocation`, holding `true`; no text file names a package
+  launcher or download tool; skill, agent, command, and README entry files use
+  no `$NAME` or `${NAME}` other than `${CLAUDE_PLUGIN_ROOT}`,
+  `${CLAUDE_SKILL_DIR}`, or `$ARGUMENTS`; its
   `plugin.json` declares no key that can run code and no listing key (`icon`
   or a `*Url` field);
   its `README.md` (at least 40 words outside code blocks) and `LICENSE`
@@ -113,8 +113,10 @@ alone.
 `--strict` fails on warnings, and `--profile directory` adds the subset of the
 plugin directory's checks the CLI can run (README, license, icon, and manifest
 shape). The directory's policy review and security scan run only in the portal,
-so `directory-policy` encodes what past scans reported, and a release is
-scanned on its branch before it merges (`docs/releasing.md`).
+so `directory-policy` encodes only the past findings a file check can catch: it
+flags a variable read in an entry file, but it passes the 0.3.1 file that drew
+the credential hold. A release is validated in the portal on its branch before
+it merges (`docs/releasing.md`).
 
 CI (`.github/workflows/ci.yml`) runs `scripts/check.sh`, the hook tests under
 macOS bash 3.2, and the `claude plugin validate` commands, with Claude Code

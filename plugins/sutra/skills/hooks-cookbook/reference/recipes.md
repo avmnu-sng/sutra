@@ -193,7 +193,7 @@ CI holds the line for those.
 set -u
 deny='(^|/)(docs/private|\.notes|scratch)/|(^|/)PLANNING\.md$'
 hit="$(git diff --cached --name-only --diff-filter=ACMR -z 2>/dev/null |
-  tr '\0' '\n' | grep -E -e "${DENY_REGEX:-$deny}")" || exit 0
+  tr '\0' '\n' | grep -E -e "$deny")" || exit 0
 printf 'Internal-only paths are staged; unstage them before committing:\n%s\n' "$hit" >&2
 exit 1
 ```
@@ -230,7 +230,7 @@ printf '%s\n' "$cmd" | grep -Eq -e "$git_commit" || exit 0
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 deny='(^|/)(docs/private|\.notes|scratch)/|(^|/)PLANNING\.md$'
 hit="$(git diff --cached --name-only --diff-filter=ACMR -z 2>/dev/null |
-  tr '\0' '\n' | grep -E -e "${DENY_REGEX:-$deny}")" || exit 0
+  tr '\0' '\n' | grep -E -e "$deny")" || exit 0
 reply hookSpecificOutput.hookEventName PreToolUse \
   hookSpecificOutput.permissionDecision deny \
   hookSpecificOutput.permissionDecisionReason "Internal-only paths are staged: $(printf '%s' "$hit" | tr '\n' ' ')- unstage them before committing."
