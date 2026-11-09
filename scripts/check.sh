@@ -310,7 +310,33 @@ bad_paths='
 # there; everything that runs on its own lives in plugins/sutra-harness.
 # The checklist still holds an .ico for a reviewer, so this gate rejects ICO too.
 check_directory_policy() {
-  local dir=plugins/sutra out scan line words f
+  local dir=plugins/sutra out names scan line words f
+  names='
+    use strict;
+    use warnings;
+    my $device = qr/\A(?:con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\..*)?\z/i;
+    my ($count, %folded, %seen) = (0);
+    local $/ = "\0";
+    while (my $path = <STDIN>) {
+      chomp $path;
+      $count++;
+      my $prefix = "";
+      for my $part (split /\//, $path) {
+        $prefix = $prefix eq "" ? $part : "$prefix/$part";
+        next if $seen{$prefix}++;
+        (my $shown = $prefix) =~ s/([^\x20-\x7e])/sprintf "\\x%02x", ord $1/ge;
+        print "$shown: holds a colon or another character Windows refuses, ends in a dot or space, or is a reserved device name\n"
+          if $part =~ /[:<>"|?*\\]|[. ]\z/ || $part =~ $device;
+        my $low = lc $prefix;
+        if (exists $folded{$low}) {
+          print "$shown: differs from $folded{$low} only by case\n";
+        } else {
+          $folded{$low} = $shown;
+        }
+      }
+    }
+    print "$count\n";
+  '
   scan='
     use strict;
     use warnings;
@@ -324,11 +350,11 @@ check_directory_policy() {
     my $text = qr/\.(?:md|markdown|txt|json|ya?ml)\z|(?:\A|\/)(?:LICENSE|LICENCE|COPYING|NOTICE|README|\.gitignore)\z/i;
     my $pm = qr/(?:\A|\/)(?:package(?:-lock)?\.json|npm-shrinkwrap\.json|pnpm-(?:workspace|lock)\.ya?ml|yarn\.lock|\.yarnrc(?:\.ya?ml)?|\.npmrc|bun\.lockb?|bunfig\.toml|deno\.(?:json|jsonc|lock)|composer\.(?:json|lock)|bower\.json|pubspec\.ya?ml|environment\.ya?ml|[^\/]*(?:requirements|constraints)[^\/]*\.txt|requirements\/[^\/]+\.txt|pipfile(?:\.lock)?|poetry\.lock|uv\.lock)\z/i;
     my $runs = qr/\A(?:(?:hooks|workflows|bin|monitors)\/|(?:\.mcp|\.lsp|settings)\.json\z)/i;
-    my $device = qr/\A(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.[^.]*)?\z/i;
     my $component = qr/\A(?:skills\/[^\/]+\/SKILL|agents\/.+|commands\/.+|output-styles\/.+)\.md\z/i;
     my $entry = qr/\A(?:skills\/[^\/]+\/SKILL\.md|agents\/.+\.md|commands\/.+\.md|output-styles\/.+\.md|README\.md)\z/i;
     my %scanned = map { $_ => 1 } qw(name description tools disable-model-invocation);
-    my ($count, %folded) = (0);
+    sub whole_webp { my $size = unpack("V", substr($_[0], 4, 4)); return $size >= 12 && $size + 8 == length $_[0] }
+    my ($count, %bundled, @texts) = (0);
     local $/ = "\0";
     while (my $name = <STDIN>) {
       chomp $name;
@@ -336,13 +362,7 @@ check_directory_policy() {
       my $size = -s _;
       $count++;
       (my $rel = $name) =~ s/\A\Q$dir\E\///;
-      for my $part (split /\//, $rel) {
-        print "$name: the name part \"$part\" holds a colon, ends in a dot or space, or is a reserved device name\n"
-          if $part =~ /:|[. ]\z/ || $part =~ $device;
-        print "$name: macOS archive metadata (__MACOSX)\n" if $part eq "__MACOSX";
-      }
-      print "$name: differs from $folded{lc $rel} only by case\n" if exists $folded{lc $rel};
-      $folded{lc $rel} = $name;
+      print "$name: macOS archive metadata (__MACOSX)\n" if grep { $_ eq "__MACOSX" } split /\//, $rel;
       print "$name: a plugin path that runs code or declares a hook or server\n" if $rel =~ $runs;
       print "$name: a package manager configuration file\n" if $rel =~ $pm;
       print "$name: a skill file must be named SKILL.md exactly\n" if $rel =~ /\Askills\/[^\/]+\/skill\.md\z/i && $rel !~ /\/SKILL\.md\z/;
@@ -352,15 +372,20 @@ check_directory_policy() {
       close $fh;
       my ($ext) = $rel =~ /\.([^.\/]+)\z/;
       $ext = lc($ext // "");
+      if ($ext =~ /\A(?:png|jpe?g|gif|webp|svg|ico|bmp|avif|woff2?|ttf|otf|eot)\z/) {
+        (my $base = $rel) =~ s/.*\///;
+        $bundled{lc $base} = 1;
+      }
       if (exists $head{$ext}) {
         print "$name: not a complete .$ext image\n"
-          unless $data =~ $head{$ext} && (!exists $tail{$ext} || $data =~ $tail{$ext});
+          unless $data =~ $head{$ext} && (!exists $tail{$ext} || $data =~ $tail{$ext}) && ($ext ne "webp" || whole_webp($data));
         next;
       }
       if ($rel !~ $text) {
         print "$name: not Markdown, text, JSON, YAML, or a PNG, JPEG, GIF, or WebP image\n";
         next;
       }
+      push @texts, [$name, $rel, $data];
       print "$name: starts with #!\n" if $data =~ /\A(?:\xef\xbb\xbf)?#!/;
       print "$name: holds a NUL byte\n" if index($data, "\0") >= 0;
       my $copy = $data;
@@ -395,8 +420,41 @@ check_directory_policy() {
       print "$name: runs a shell command when it loads (an inline !`...` or a ```! block)\n"
         if $rel =~ /\A(?:skills\/[^\/]+\/SKILL|commands\/.+)\.md\z/i && ($data =~ /(?:^|\s)!`/m || $data =~ /^[ \t]*```!/m);
     }
+    if (%bundled) {
+      my $any = join "|", map { quotemeta } sort keys %bundled;
+      my $hit = qr/(?<![\w.-])($any)(?![\w-]|\.\w)/i;
+      for my $t (@texts) {
+        my ($name, $rel, $data) = @$t;
+        my $markdown = $rel =~ /\.(?:md|markdown)\z/i;
+        my ($close, $code, $rest, $gap, $deep) = ("", "", "", 1, 4);
+        for my $line (split /\r?\n/, $data) {
+          if ($close) {
+            if ($line =~ $close) { $close = "" } else { $code .= "$line\n" }
+          } elsif ($markdown && $gap && $line =~ /^(?: {$deep}|\t)/) {
+            $code .= "$line\n";
+          } elsif ($line =~ /^([ \t]*(?:(?:[-+*]|\d{1,9}[.)])[ \t]+)*)(`{3,}(?!.*`)|~{3,})/) {
+            my ($c, $n, $max) = (substr($2, 0, 1), length $2, length($1) + 3);
+            $close = qr/^[ \t]{0,$max}\Q$c\E{$n,}[ \t]*$/;
+            $code .= "$line\n";
+            $rest .= "\n";
+          } else {
+            $rest .= "$line\n";
+            $gap = $line !~ /\S/;
+            $deep = $line =~ /^( *(?:[-+*]|\d+[.)])[ \t]+)/ ? 4 + length $1 : $line =~ /^\S/ ? 4 : $deep;
+          }
+        }
+        for my $para (split /\n[ \t]*\n|\n(?=[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t])/, $rest) {
+          $code .= "$2\n" while $para =~ /(?<![`\\])(`+)(?!`)(.+?)(?<!`)\1(?!`)/sg;
+        }
+        print "$name: writes the bundled file $1 in backticks or a code block, which the directory holds for a reviewer\n" if $code =~ $hit;
+        print "$name: shows the bundled file $1 with an HTML tag, and the directory asks for Markdown image syntax\n" if $rel =~ /\AREADME\.md\z/i && $data =~ /<(?:img|source)\b[^>]*$hit/i;
+        print "$name: names the bundled file $1 from a command, which the directory holds for a reviewer\n" if $rel =~ /\Acommands\//i && $data =~ $hit;
+      }
+    }
     print "$count\n";
   '
+  out="$(files | perl -e "$names")" || problem "the name scan failed"
+  collect "$out"
   out="$(files "$dir" | perl -e "$scan" "$dir")" || problem "the file scan failed"
   collect "$out"
   while IFS= read -r line; do
@@ -409,10 +467,11 @@ check_directory_policy() {
   words="$(perl -0777 -ne 's/^[ \t]*```.*?^[ \t]*```[^\n]*$//msg; my @w = split; print scalar @w' "$dir/README.md" 2>/dev/null)"
   [ "${words:-0}" -ge 40 ] || problem "$dir/README.md: ${words:-0} words outside code blocks, and the directory wants at least 40"
   while IFS= read -r -d '' f; do
-    grep -Eq '(^|[[:space:]])(export-ignore|export-subst|filter=)' "$f" &&
-      problem "$f: export-ignore, export-subst, or filter changes the files the directory fetches"
+    regular "$f" || continue
+    perl -ne 'next if /^\s*(?:#|$)/; s/^\s*(?:"(?:[^"\\]|\\.)*"|\S+)//; $hit = 1 if /(?:^|\s)(?:export-ignore|export-subst|filter|text|eol|crlf|ident|working-tree-encoding)(?:=\S*)?(?=\s|$)/; END { exit !$hit }' <"$f" &&
+      problem "$f: sets an attribute that drops or rewrites files the directory fetches (export-ignore, export-subst, filter, text, eol, crlf, ident, or working-tree-encoding)"
   done < <(files .gitattributes '*/.gitattributes')
-  finish directory-policy "$count files under $dir: allowed types and names only, complete images, every file under 5 MiB, UTF-8 text without NUL or #!, no hook, workflow, server, shell injection, or package manager file; frontmatter and manifest keys allowlisted; text free of launcher and download tool names; entry files free of uppercase variable reads; README (40 words outside code) and LICENSE present"
+  finish directory-policy "$count files under $dir: allowed types and names only, complete images, every file under 5 MiB, UTF-8 text without NUL or #!, no hook, workflow, server, shell injection, or package manager file; frontmatter and manifest keys allowlisted; text free of launcher and download tool names and of bundled image paths in code; entry files free of uppercase variable reads; README (40 words outside code) and LICENSE present; repository names free of characters Windows refuses, trailing dots and spaces, device names, and case collisions; no .gitattributes that drops or rewrites files"
 }
 
 check_workflows() {

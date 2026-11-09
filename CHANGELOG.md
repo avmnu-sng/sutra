@@ -6,6 +6,16 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- `directory-policy` in `scripts/check.sh` follows more of the directory's
+  pre-submission checklist. It checks file and folder names across the whole
+  repository, including characters Windows refuses and case collisions at any
+  folder level; refuses every `.gitattributes` setting that rewrites file
+  contents; checks that a WebP is complete; and reports a bundled image or font
+  named in backticks, a code block, or a command file, or shown in the README
+  with an HTML tag.
+
 ## [0.3.2] - 2026-11-09
 
 ### Changed
