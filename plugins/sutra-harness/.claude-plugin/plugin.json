@@ -1,7 +1,7 @@
 {
   "name": "sutra-harness",
   "description": "The automatic half of Sutra: a layered operating contract at session start, short rule cards when they apply, hidden-Unicode warnings, a compaction brief, a verify-before-stop nudge under the strict profile, and the build-orchestrator workflow. Runs one Bash hook script, and installs the sutra skills plugin as a dependency.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "author": {
     "name": "avmnu-sng"
   },

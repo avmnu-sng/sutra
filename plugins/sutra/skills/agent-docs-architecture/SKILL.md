@@ -15,8 +15,8 @@ tree where a thin entry doc routes to deeper guides, one rulebook is shared
 verbatim across tools, every doc's job is declared, and one doc is named as
 ground truth. The machine-readable manifest that binds these pieces together
 -- entry-doc path, rulebook path, source-path-to-domain routing, skill
-order -- lives in `examples/setup.yaml`. Treat that file as the contract and
-this skill as the rationale.
+order -- lives in the project's own `examples/setup.yaml`, which you create.
+Treat that file as the contract and this skill as the rationale.
 
 ## When to use
 

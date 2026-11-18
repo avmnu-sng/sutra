@@ -1,14 +1,14 @@
 ---
-description: Scaffold a repeatable execution-plan structure (master plan, session protocol, dev loop, slice index, and per-slice templates) for a large, multi-session build that must survive across many sessions, for the /sutra-harness:build-orchestrator workflow to drive.
+description: Scaffold a repeatable execution-plan structure (master plan, session protocol, dev loop, slice index, and per-slice templates) for a large, multi-session build that must survive across many sessions, run by hand or by the separate sutra-harness plugin when it is installed.
 disable-model-invocation: true
 ---
 
 # Scaffold execution plan
 
 Lay down a durable, resumable structure for a build too large for one
-session, for the `/sutra-harness:build-orchestrator` workflow to drive. The
-structure is the source of truth across sessions: what to build next, in
-what order, and what "done" means for each unit of work.
+session, run by hand or by the separate `sutra-harness` plugin when it is
+installed. The structure is the source of truth across sessions: what to
+build next, in what order, and what "done" means for each unit of work.
 
 This skill copies ready-made skeleton files that carry explicit TODO
 placeholders. It does not invent project specifics -- you (or a later
@@ -78,10 +78,10 @@ execution_plan/
   handoffs/          (one handoff per completed slice)
 ```
 
-The orchestrator ships in the `sutra-harness` plugin, from the same
-marketplace as this one, and runs as `/sutra-harness:build-orchestrator`
-(Step 3); there is nothing to copy. Without the harness, run the slices by
-hand, one session each, under `SESSION_PROTOCOL.md`. To change the
+The orchestrator ships in the separate `sutra-harness` plugin, which is
+installed from the GitHub marketplace and not from Anthropic's directory, and
+runs as `/sutra-harness:build-orchestrator` (Step 3); there is nothing to
+copy. Without the harness, run the slices by hand, one session each, under `SESSION_PROTOCOL.md`. To change the
 orchestrator's prompts, stages, or plan format, copy
 `workflows/build-orchestrator.workflow.js` from the installed `sutra-harness`
 plugin into the project's `.claude/workflows/` and edit it there. Keep
@@ -156,7 +156,8 @@ enforced, not merely documented.
 
 ## Step 3 -- run it
 
-Run `/sutra-harness:build-orchestrator` in the target project, from the build
+With the `sutra-harness` plugin installed, run
+`/sutra-harness:build-orchestrator` in the target project, from the build
 branch or worktree (`/build-orchestrator` for a customized copy). It reads
 `execution_plan/sessions/INDEX.md`, selects every non-DONE slice in listed
 order, and drives each through the build -> review -> fix -> validate ->
@@ -273,5 +274,6 @@ Do NOT:
 - [ ] Release milestones grouped with a version/tag scheme, and cut
       criteria filled or explicitly marked TODO.
 - [ ] No project specifics invented -- every unknown is a visible TODO.
-- [ ] `/sutra-harness:build-orchestrator` (or a customized copy, run as
-      `/build-orchestrator`) launched from the build branch or worktree.
+- [ ] With the harness installed, `/sutra-harness:build-orchestrator` (or a
+      customized copy, run as `/build-orchestrator`) launched from the build
+      branch or worktree.

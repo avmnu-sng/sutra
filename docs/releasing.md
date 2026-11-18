@@ -86,20 +86,21 @@ broken tree.
    again. `check_manifests` must report `one shared version: X.Y.Z`; it fails
    when one `plugin.json` was not bumped or the changelog was not rolled.
 
-6. **Commit on a release branch and validate it in the portal.** One commit
-   for the bump plus the changelog roll, with an imperative subject and a
-   conventional prefix (e.g. `chore: release vX.Y.Z`). Push the branch. The
-   local commands above do not run the directory's checks: `claude plugin
-   validate` checks only that files are well-formed. In the developer portal
-   choose **Submit new**, then **Plugin bundle**, enter the repository, the
-   release branch, and the plugin path `plugins/sutra`, and select **Validate**.
-   Do not submit: the existing submission stays on `main`. Fix anything marked
-   Blocks on the branch, re-run the step 5 gate, and select **Re-validate**.
-   Holds and notes may remain; a reviewer clears a hold. The directory's policy
-   review and security scan run only after the commit reaches the tracked
-   branch, which step 11 checks.
+6. **Commit on a release branch.** One commit for the bump plus the changelog
+   roll, with an imperative subject and a conventional prefix (e.g.
+   `chore: release vX.Y.Z`). Push the branch and open a pull request. The local
+   commands above do not run the directory's checks: `claude plugin validate`
+   checks only that files are well-formed, and the portal cannot check the
+   branch first, because the submission for `plugins/sutra` follows `main` and
+   validates only that branch. The directory first sees a release when step 7
+   merges it, and step 11 reads the result.
 
-7. **Land it on `main`.** Merge the release branch, then confirm
+7. **Land it on `main`.** The directory follows `main`, and this repository's
+   push webhook starts a scan on each push there, so the merge starts a new
+   scan. If a version is with a reviewer, decide first whether to wait: the
+   portal docs do not say what a new commit does to a version in review, and
+   on a plugin that was never published a failed security scan rejects the
+   submission. Merge the release branch, then confirm
    `.github/workflows/ci.yml` is green on that exact SHA in all three of its
    jobs, `checks`, `hook-tests-macos`, and `plugin-validate`. Green on "a
    recent run" is not green on this SHA.
@@ -143,10 +144,15 @@ broken tree.
 11. **Re-check the directory listing.** Only `sutra` is submitted to
     Anthropic's plugin directory; `sutra-harness` ships hooks, which the
     directory accepts only from Verified organizations. On `sutra`'s page in
-    the developer portal (claude.ai/directory/manage), select **Check for new
-    commits** so the directory scans the tagged commit now rather than at its
-    next scheduled check. The portal runs checks and a security scan the CLI
-    cannot; read the Versions tab and fix anything marked Blocks. When the
+    the developer portal (claude.ai/directory/manage), confirm the merge
+    commit is being scanned; if it is not, select **Check for new commits**.
+    The portal runs checks and a security scan the CLI cannot. Read the
+    Versions tab and fix anything marked Blocks in the next release. Clear a
+    **Policy hold** or a **Warning** too: a reviewer has to read every held
+    version, and the scan can raise the same finding on each new one. Notes
+    may remain. To see which file a finding is about, choose **Submit new**,
+    then **Plugin bundle**, enter the repository, `main`, and the plugin path
+    `plugins/sutra`, and select **Validate** without submitting. When the
     version passes, select **Publish**, unless the plugin publishes new
     versions automatically.
 

@@ -1,7 +1,7 @@
 {
   "name": "sutra",
   "description": "Senior-engineer methodology for Claude Code: twenty skills and four read-only subagents for architecture review, verification, test authoring, debugging, data migration, multi-session builds, agent security, and commit craft. Markdown only, with no hooks, scripts, or servers.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "author": {
     "name": "avmnu-sng"
   },

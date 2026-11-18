@@ -32,7 +32,7 @@ counts as a reply only when it is one JSON object and nothing else. Exit 2 is
 a blocking error whose effect depends on the event, with stderr as its
 message. Any other code is a non-blocking error: the flow proceeds.
 
-Per the Claude Code hooks reference (https://code.claude.com/docs/en/hooks):
+Per the Claude Code hooks reference:
 
 | Event | Can it stop something? | How | `additionalContext` |
 |---|---|---|---|
@@ -46,8 +46,10 @@ Per the Claude Code hooks reference (https://code.claude.com/docs/en/hooks):
 | `Notification` | No | exit code and stderr are ignored | no |
 
 Other events have their own rules (`PermissionRequest` ignores exit 2 and
-denies only through its `decision` object); check the reference first. Plain
-stdout on `SessionStart` and `UserPromptSubmit` also reaches Claude.
+denies only through its `decision` object); check the Claude Code hooks
+reference first (`/sutra:agent-security` links it at the end of its
+`reference/threats.md`). Plain stdout on `SessionStart` and
+`UserPromptSubmit` also reaches Claude.
 `systemMessage` is a warning shown to the user; `hookSpecificOutput` carries
 `hookEventName` plus the event's own fields; `continue: false` stops Claude
 outright, so an advisory hook never sets it.
@@ -119,8 +121,9 @@ even one that only warns at the wrong moment, is a surprise.
   verify-before-stop nudge: a `Stop` hook that asks Claude once to run the
   project's checks when code changed and no check ran since. It never fires
   while `stop_hook_active` is true, never twice for the same edits, never when
-  Claude ends on a question, and `SUTRA_GATE=off` turns it off. It never
-  blocks a tool call and stays local. This plugin, `sutra`, ships no hooks.
+  Claude ends on a question, and the user can turn it off with the switch
+  named in the `sutra-harness` README. It never blocks a tool call and stays
+  local. This plugin, `sutra`, ships no hooks.
 - **Blocking or mutating hooks are opt-in.** The user wires them in their own
   `settings.json`, or the hook does nothing unless a switch the user sets
   turns it on.
@@ -136,7 +139,7 @@ even one that only warns at the wrong moment, is a surprise.
   `pre-commit` and a Claude Code hook; it would run twice.
 - **Templates.** `examples/hooks/` in the sutra repository
   (`source-change-requires-test.sh`, `empty-test-detector.sh`) encodes the
-  fail-open contract, with every knob an environment variable.
+  fail-open contract, with every knob configurable without editing the script.
 
 ## Checklist
 

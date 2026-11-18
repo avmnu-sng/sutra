@@ -1,6 +1,6 @@
 # Agent security: commands and patterns
 
-The concrete commands behind sections 3 to 5 of `SKILL.md`, read on demand.
+The commands and patterns behind sections 3 to 5 of `SKILL.md`, read on demand.
 
 ## Scan for hidden characters
 
@@ -27,18 +27,20 @@ ending in `|` as a shell command. `--` keeps a leading `-` from being a switch.
 Explain every one of these in a plugin, MCP server, or skill, or do not
 install it:
 
-- package launchers that resolve an unpinned version at run time (`npx`,
-  `bunx`, `pnpm dlx`, `yarn dlx`, `uvx`, `pipx run`, `uv run`);
-- a downloaded script fed straight into a shell interpreter, directly or after
-  decoding (`curl` or `wget` into `sh`, base64 or hex into one);
-- reads of `~/.ssh`, `~/.aws`, `.env`, or tokens;
+- package launchers that resolve an unpinned version at run time: any package
+  tool, most often for JavaScript or Python, that fetches a package or a
+  script's dependencies and runs it in one step, whether through a companion
+  command or a subcommand of the tool itself;
+- a script fed straight into a shell interpreter, whether downloaded, decoded
+  from base64 or hex, or both;
+- reads of SSH keys, cloud provider credentials, environment files, or tokens;
 - unexplained network calls;
 - writes to settings, hooks, CI, or memory files;
 - tool descriptions with instructions.
 
 ## Permission-rule examples
 
-- `Bash(curl *)` misses `/usr/bin/curl`: Bash rules match command text, not the
-  program.
-- `curl` and `wget` are not auto-approved by default; keep it that way.
-- `Bash(npx:*)` runs any package, so never allow that prefix.
+- `Bash(rm *)` misses `/bin/rm`: Bash rules match command text, not the program.
+- Download tools are not auto-approved by default; keep it that way.
+- `Bash(x:*)`, where `x` is a package launcher, runs any package, so never
+  allow that prefix.

@@ -78,24 +78,30 @@ line per check:
   absolute path, command substitution, or variable other than a braced
   `${CLAUDE_PLUGIN_ROOT}` in a `hooks.json` command.
 - **directory-policy:** `plugins/sutra` holds only Markdown, text, JSON,
-  YAML, and complete PNG, JPEG, GIF, WebP, or ICO images, each file under 5
+  YAML, and complete PNG, JPEG, GIF, or WebP images, each file under 5
   MiB; every text file is UTF-8 with no NUL byte and does not start with
   `#!`; there is no hook, workflow, `bin/`, server configuration, or package
   manager file, no Markdown frontmatter that declares `hooks` or
   `mcpServers`, and no skill or command that runs a shell command when it
-  loads (an inline ``!`...` `` or a ```` ```! ```` block); no name holds a
-  colon, ends in a dot or space, is a reserved device name, or differs from
-  another only by case; skill and agent frontmatter uses only `name`,
+  loads (an inline ``!`...` `` or a ```` ```! ```` block); no file or folder
+  name in the repository holds a colon or another character Windows refuses,
+  ends in a dot or space, is a reserved device name, or differs from another
+  only by case at any folder level; skill and agent frontmatter uses only
+  `name`,
   `description`, and `tools`, each holding text, and
-  `disable-model-invocation`, holding `true`; skill, agent, command, and README
-  entry files name no package launcher or download tool and read no environment
-  variable other than `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_SKILL_DIR}`, or
-  `$ARGUMENTS`; its
+  `disable-model-invocation`, holding `true`; no text file names a package
+  launcher or download tool, or writes a bundled image or font name in
+  backticks or a code block; no command file names a bundled image or font;
+  the `README.md` shows a bundled image only with Markdown image syntax;
+  skill, agent, command, and README entry files use
+  no `$NAME` or `${NAME}` other than `${CLAUDE_PLUGIN_ROOT}`,
+  `${CLAUDE_SKILL_DIR}`, or `$ARGUMENTS`; its
   `plugin.json` declares no key that can run code and no listing key (`icon`
   or a `*Url` field);
   its `README.md` (at least 40 words outside code blocks) and `LICENSE`
-  exist; and no `.gitattributes` uses `export-ignore`, `export-subst`, or
-  `filter`.
+  exist; and no `.gitattributes` in the repository sets `export-ignore`,
+  `export-subst`, `filter`, `text`, `eol`, `crlf`, `ident`, or
+  `working-tree-encoding`.
 - **workflows:** each `plugins/sutra-harness/workflows/*.js` compiles, led by
   a plain-literal `export const meta`.
 - **hook-tests:** `tests/hooks.sh`, which runs
@@ -113,8 +119,10 @@ alone.
 `--strict` fails on warnings, and `--profile directory` adds the subset of the
 plugin directory's checks the CLI can run (README, license, icon, and manifest
 shape). The directory's policy review and security scan run only in the portal,
-so `directory-policy` encodes what past scans reported, and a release is
-scanned on its branch before it merges (`docs/releasing.md`).
+so `directory-policy` encodes only the checklist rows and past findings a file
+check can catch: it flags a variable read in an entry file, but it passes the
+0.3.1 file that drew the credential hold. The portal checks a release only once
+it reaches `main` (`docs/releasing.md`).
 
 CI (`.github/workflows/ci.yml`) runs `scripts/check.sh`, the hook tests under
 macOS bash 3.2, and the `claude plugin validate` commands, with Claude Code

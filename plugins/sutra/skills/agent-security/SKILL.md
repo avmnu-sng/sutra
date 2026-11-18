@@ -48,8 +48,8 @@ which the model reads and you do not, after you approve it, so read them at
 install and after each update. Run scripts and tool calls that touch external
 web services in a VM. With `sutra-harness` installed, its untrusted-content
 card arrives once per session, after the first WebFetch or WebSearch (again
-after `/clear` or a compaction), under every profile unless
-`SUTRA_SECURITY=off`; not for Bash or MCP output.
+after `/clear` or a compaction), under every profile unless you turn off its
+security floor; not for Bash or MCP output.
 
 ## 3. Hidden characters
 
@@ -68,12 +68,13 @@ instruction files: `CLAUDE.md`, `AGENTS.md`, `CLAUDE.local.md`,
 first hidden character per file, with code point and line, to Claude and to
 you; skips files over 4 MiB, and binary files other than instruction files (a
 NUL in an instruction file is reported); and runs under every profile unless
-you set `SUTRA_SECURITY=off`. It does not scan Bash or Grep output, web pages,
-or MCP tool text; save a copy and scan that. A hit in an instruction file makes
-the whole file untrusted until the user has seen the decoded text; in a file
-Claude wrote, remove it unless the content needs it. To list every hit, run the
-scan in [reference/commands.md](reference/commands.md); no output means none
-of those characters.
+you turn it off (the `sutra-harness` README names the switch). It does not scan
+Bash or Grep output, web pages, or MCP tool text; save a copy and scan that. A
+hit in an instruction file makes the whole file untrusted until the user has
+seen the decoded text; in a file Claude wrote, remove it unless the content
+needs it. To list every hit, run the scan in
+[reference/commands.md](reference/commands.md); no output means none of those
+characters.
 
 ## 4. Vet a plugin, MCP server, or skill before you install it
 
@@ -113,7 +114,7 @@ Installing enables it unless its manifest or marketplace entry sets
   repository, `Bash(git *)` (`git -c` runs a program you name), a package launcher's
   prefix and `Bash(docker exec *)` (run any command), `Bash(rg:*)` (`rg --pre=CMD`
   runs CMD per file). `Bash(x:*)` is the same rule as `Bash(x *)`.
-  Concrete examples are in [reference/commands.md](reference/commands.md).
+  Rule examples are in [reference/commands.md](reference/commands.md).
 - **Sandbox for untrusted work:** `/sandbox` or `sandbox.enabled`. Bash and
   its child processes can then write only to the working, temp, and added
   directories and reach only allowed domains, none by default; another host
