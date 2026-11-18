@@ -6,6 +6,19 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-11-18
+
+### Changed
+
+- `scrub-before-publish` names the variable in its leaked-value search
+  `missed` instead of `secret`, to address a plugin directory hold for using a
+  credential from the user's machine. The variable holds the path to a local
+  file with the leaked value to search for. The search prints only file names
+  and counts, and nothing in the plugin sends the value anywhere.
+- `directory-policy` in `scripts/check.sh` reports a `$NAME` or `${NAME}`
+  variable with `TOKEN`, `SECRET`, `PASSWORD`, `KEY`, or `AUTH` in its name, in
+  any letter case, in any text file under `plugins/sutra`.
+
 ### Fixed
 
 - `docs/releasing.md` no longer says a merge to `main` starts a directory scan

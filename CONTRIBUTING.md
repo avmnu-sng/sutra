@@ -91,7 +91,9 @@ line per check:
   `description`, and `tools`, each holding text, and
   `disable-model-invocation`, holding `true`; no text file names a package
   launcher or download tool, or writes a bundled image or font name in
-  backticks or a code block; no command file names a bundled image or font;
+  backticks or a code block; no text file uses a `$NAME` or `${NAME}` variable
+  with `TOKEN`, `SECRET`, `PASSWORD`, `KEY`, or `AUTH` in its name, in any
+  letter case; no command file names a bundled image or font;
   the `README.md` shows a bundled image only with Markdown image syntax;
   skill, agent, command, and README entry files use
   no `$NAME` or `${NAME}` other than `${CLAUDE_PLUGIN_ROOT}`,

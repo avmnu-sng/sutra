@@ -391,6 +391,8 @@ check_directory_policy() {
       my $copy = $data;
       print "$name: not UTF-8\n" unless eval { Encode::decode("UTF-8", $copy, Encode::FB_CROAK()); 1 };
       print "$name: names $1, and the directory flags a download-and-run command in any text it reads\n" if $data =~ /\b(curl|wget|npx|pnpx|uvx|bunx|pipx|(?-i:dlx)|uv\s+(?:tool\s+)?run|npm\s+exec|bun\s+x)\b/i;
+      my ($var) = grep { /token|secret|password|key|auth/i } $data =~ /\$\{?([A-Za-z_][A-Za-z0-9_]*)/g;
+      print "$name: uses the variable \$$var, whose name looks like a credential to Claude Code (TOKEN, SECRET, PASSWORD, KEY, or AUTH in any case), and the directory can hold a version that reads a credential\n" if defined $var;
       next unless $rel =~ /\.md\z/i;
       if ($data =~ /\A(?:\xef\xbb\xbf)?---\r?\n(.*?)^---\r?$/ms) {
         my $fm = $1;
@@ -471,7 +473,7 @@ check_directory_policy() {
     perl -ne 'next if /^\s*(?:#|$)/; s/^\s*(?:"(?:[^"\\]|\\.)*"|\S+)//; $hit = 1 if /(?:^|\s)(?:export-ignore|export-subst|filter|text|eol|crlf|ident|working-tree-encoding)(?:=\S*)?(?=\s|$)/; END { exit !$hit }' <"$f" &&
       problem "$f: sets an attribute that drops or rewrites files the directory fetches (export-ignore, export-subst, filter, text, eol, crlf, ident, or working-tree-encoding)"
   done < <(files .gitattributes '*/.gitattributes')
-  finish directory-policy "$count files under $dir: allowed types and names only, complete images, every file under 5 MiB, UTF-8 text without NUL or #!, no hook, workflow, server, shell injection, or package manager file; frontmatter and manifest keys allowlisted; text free of launcher and download tool names and of bundled image paths in code; entry files free of uppercase variable reads; README (40 words outside code) and LICENSE present; repository names free of characters Windows refuses, trailing dots and spaces, device names, and case collisions; no .gitattributes that drops or rewrites files"
+  finish directory-policy "$count files under $dir: allowed types and names only, complete images, every file under 5 MiB, UTF-8 text without NUL or #!, no hook, workflow, server, shell injection, or package manager file; frontmatter and manifest keys allowlisted; text free of launcher and download tool names, dollar-sign variables named like a credential, and bundled image paths in code; entry files free of uppercase variable reads; README (40 words outside code) and LICENSE present; repository names free of characters Windows refuses, trailing dots and spaces, device names, and case collisions; no .gitattributes that drops or rewrites files"
 }
 
 check_workflows() {
