@@ -6,17 +6,7 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Changed
-
-- `directory-policy` in `scripts/check.sh` follows more of the directory's
-  pre-submission checklist. It checks file and folder names across the whole
-  repository, including characters Windows refuses and case collisions at any
-  folder level; refuses every `.gitattributes` setting that rewrites file
-  contents; checks that a WebP is complete; and reports a bundled image or font
-  named in backticks, a code block, or a command file, or shown in the README
-  with an HTML tag.
-
-## [0.3.2] - 2026-11-09
+## [0.3.2] - 2026-11-18
 
 ### Changed
 
@@ -36,11 +26,18 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `scaffold-execution-plan`, `multi-session-build`, `agent-docs-architecture`,
   and the `sutra` README no longer imply that a directory install includes
   `sutra-harness` or a sample `examples/setup.yaml`.
-- `directory-policy` in `scripts/check.sh` keeps launcher and download tool
-  names out of every text file in `plugins/sutra`, not only entry files, and
-  refuses ICO images, which the checklist holds for a reviewer.
-- `docs/releasing.md` covers Warning results, says how to tell whether portal
-  Validate reports holds, and says that a merge to `main` starts a new scan.
+- `directory-policy` in `scripts/check.sh` follows more of the directory's
+  pre-submission checklist. It keeps launcher and download tool names out of
+  every text file in `plugins/sutra`, not only entry files; refuses ICO images,
+  which the checklist holds for a reviewer; checks file and folder names across
+  the whole repository, including characters Windows refuses and case
+  collisions at any folder level; refuses every `.gitattributes` setting that
+  rewrites file contents; checks that a WebP is complete; and reports a bundled
+  image or font named in backticks, a code block, or a command file, or shown
+  in the README with an HTML tag.
+- `docs/releasing.md` says that the portal checks a release only once it
+  reaches `main`, how to find the file behind a finding, how to treat holds
+  and warnings, and that a merge to `main` starts a new scan.
 
 ## [0.3.1] - 2026-11-09
 

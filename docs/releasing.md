@@ -86,27 +86,14 @@ broken tree.
    again. `check_manifests` must report `one shared version: X.Y.Z`; it fails
    when one `plugin.json` was not bumped or the changelog was not rolled.
 
-6. **Commit on a release branch and validate it in the portal.** One commit
-   for the bump plus the changelog roll, with an imperative subject and a
-   conventional prefix (e.g. `chore: release vX.Y.Z`). Push the branch. The
-   local commands above do not run the directory's checks: `claude plugin
-   validate` checks only that files are well-formed. In the developer portal
-   choose **Submit new**, then **Plugin bundle**, enter the repository, the
-   release branch, and the plugin path `plugins/sutra`, and select **Validate**.
-   Do not submit: the existing submission stays on `main`. The
-   [pre-submission checklist](https://claude.com/docs/plugins/pre-submission-checklist)
-   says Validate runs every check in its tables, including those that hold a
-   version for a reviewer, but scan reports so far list holds under a Directory
-   policy stage, after Validation. So select **Validate** on `main` first: if
-   it does not report a hold you know is there, a clean result on the branch
-   says nothing about holds. Fix anything marked Blocks on the branch, re-run
-   the step 5 gate, push, and select **Re-validate**. Clear a **Policy hold**
-   too when you can: a reviewer has to read every held version, and the scan
-   can raise the same hold on each new one. Fix a **Warning** when you can.
-   Notes may remain. The checklist does not list every finding the scan can
-   report, such as the download-and-run warning, so a clean Validate does not
-   show that one is gone. The security scan runs only after the commit reaches
-   the tracked branch, and step 11 reads the result.
+6. **Commit on a release branch.** One commit for the bump plus the changelog
+   roll, with an imperative subject and a conventional prefix (e.g.
+   `chore: release vX.Y.Z`). Push the branch and open a pull request. The local
+   commands above do not run the directory's checks: `claude plugin validate`
+   checks only that files are well-formed, and the portal cannot check the
+   branch first, because the submission for `plugins/sutra` follows `main` and
+   validates only that branch. The directory first sees a release when step 7
+   merges it, and step 11 reads the result.
 
 7. **Land it on `main`.** The directory follows `main`, and this repository's
    push webhook starts a scan on each push there, so the merge starts a new
@@ -159,10 +146,15 @@ broken tree.
     directory accepts only from Verified organizations. On `sutra`'s page in
     the developer portal (claude.ai/directory/manage), confirm the merge
     commit is being scanned; if it is not, select **Check for new commits**.
-    The portal runs checks and a security scan the CLI cannot; read the
-    Versions tab, fix anything marked Blocks, and clear any Policy hold or
-    Warning in the next release. When the version passes, select **Publish**,
-    unless the plugin publishes new versions automatically.
+    The portal runs checks and a security scan the CLI cannot. Read the
+    Versions tab and fix anything marked Blocks in the next release. Clear a
+    **Policy hold** or a **Warning** too: a reviewer has to read every held
+    version, and the scan can raise the same finding on each new one. Notes
+    may remain. To see which file a finding is about, choose **Submit new**,
+    then **Plugin bundle**, enter the repository, `main`, and the plugin path
+    `plugins/sutra`, and select **Validate** without submitting. When the
+    version passes, select **Publish**, unless the plugin publishes new
+    versions automatically.
 
 ## The listing icon
 

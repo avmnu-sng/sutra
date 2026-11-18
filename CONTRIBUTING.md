@@ -121,8 +121,8 @@ plugin directory's checks the CLI can run (README, license, icon, and manifest
 shape). The directory's policy review and security scan run only in the portal,
 so `directory-policy` encodes only the checklist rows and past findings a file
 check can catch: it flags a variable read in an entry file, but it passes the
-0.3.1 file that drew the credential hold. A release is validated in the portal
-on its branch before it merges (`docs/releasing.md`).
+0.3.1 file that drew the credential hold. The portal checks a release only once
+it reaches `main` (`docs/releasing.md`).
 
 CI (`.github/workflows/ci.yml`) runs `scripts/check.sh`, the hook tests under
 macOS bash 3.2, and the `claude plugin validate` commands, with Claude Code
