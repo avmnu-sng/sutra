@@ -155,11 +155,11 @@ outside the tree and search with file names and counts only, so the output
 never repeats it:
 
 ```sh
-secret=/path/outside/the/tree/secret.txt
-grep -rlIF --exclude-dir=.git -f "$secret" .
-git log --all -p --cc --format=fuller | grep -cF -f "$secret"
+missed=/path/outside/the/tree/missed.txt
+grep -rlIF --exclude-dir=.git -f "$missed" .
+git log --all -p --cc --format=fuller | grep -cF -f "$missed"
 git for-each-ref --format='%(refname) %(taggername) %(taggeremail) %(contents)' |
-  grep -cF -f "$secret"
+  grep -cF -f "$missed"
 ```
 
 Clean is no file names and two counts of 0. Rotate the secret if it ever
