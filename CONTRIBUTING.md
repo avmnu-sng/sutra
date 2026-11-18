@@ -104,6 +104,13 @@ line per check:
   exist; and no `.gitattributes` in the repository sets `export-ignore`,
   `export-subst`, `filter`, `text`, `eol`, `crlf`, `ident`, or
   `working-tree-encoding`.
+- **policy-tests:** `tests/directory-policy.py`, the regression cases for
+  `directory-policy`. It clones `HEAD` into a temporary directory and, for
+  each case, resets the clone, plants files in it, and runs
+  `check_directory_policy` from your working copy of `scripts/check.sh`
+  against it, under the bash that runs `scripts/check.sh`. A violation of
+  each rule must fail with that rule's message, and a near miss must pass.
+  Names a case-insensitive disk cannot hold go into the clone's index only.
 - **workflows:** each `plugins/sutra-harness/workflows/*.js` compiles, led by
   a plain-literal `export const meta`.
 - **hook-tests:** `tests/hooks.sh`, which runs
@@ -113,10 +120,15 @@ line per check:
 
 It checks tracked files plus untracked files git does not ignore, so a new
 file is checked before you stage it. It needs `git`, `jq`, and `perl`.
-Without `shellcheck`, `python3` with PyYAML, or `node`, it prints a `skip`
-line for that check; CI sets `CI=true`, which turns a skip into a failure.
-While working on the hook, `bash tests/hooks.sh` runs the behavior cases
-alone.
+Without `shellcheck`, `node`, or `python3` (with PyYAML for the yaml check),
+it prints a `skip` line for that check; CI sets `CI=true`, which turns a skip
+into a failure. While working on the hook, `bash tests/hooks.sh` runs the
+behavior cases alone. While working on the gate,
+`python3 -I tests/directory-policy.py` runs its cases alone; `--gate FILE`
+runs them against another copy of `check.sh`, such as one from an earlier
+commit, and `BASH_UNDER_TEST` picks the bash as it does for the hook tests.
+Give every new rule in `check_directory_policy` a case there that must fail
+and a near miss that must pass.
 
 `--strict` fails on warnings, and `--profile directory` adds the subset of the
 plugin directory's checks the CLI can run (README, license, icon, and manifest
@@ -126,9 +138,10 @@ check can catch: it flags a variable read in an entry file, but it passes the
 0.3.1 file that drew the credential hold. The portal checks a release only once
 it reaches `main` (`docs/releasing.md`).
 
-CI (`.github/workflows/ci.yml`) runs `scripts/check.sh`, the hook tests under
-macOS bash 3.2, and the `claude plugin validate` commands, with Claude Code
-pinned to one version, on every push to `main` and every pull request.
+CI (`.github/workflows/ci.yml`) runs `scripts/check.sh`, the hook tests and
+`tests/directory-policy.py` under macOS bash 3.2, and the
+`claude plugin validate` commands, with Claude Code pinned to one version, on
+every push to `main` and every pull request.
 
 ## Commits and branches
 

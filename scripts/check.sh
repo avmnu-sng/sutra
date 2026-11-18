@@ -2,8 +2,9 @@
 # The repository checks CI runs, for contributors to run before a PR:
 #   bash scripts/check.sh
 # Checks tracked files plus untracked files git does not ignore. Needs git, jq
-# and perl. Without shellcheck, python3 with PyYAML, or node, that check prints a
-# skip line; under CI=true a skipped check fails instead.
+# and perl. Without shellcheck, node, or python3 (with PyYAML for the yaml
+# check), that check prints a skip line; under CI=true a skipped check fails
+# instead.
 
 set -u
 
@@ -578,6 +579,20 @@ check_hook_tests() { # check_hook_tests SHELL
   fi
 }
 
+check_policy_tests() {
+  local out
+  if ! command -v python3 >/dev/null 2>&1; then
+    skip policy-tests "python3 not found"
+    return
+  fi
+  if out="$(BASH_UNDER_TEST="$BASH" python3 -I tests/directory-policy.py 2>&1 </dev/null)"; then
+    finish policy-tests "$(printf '%s\n' "$out" | tail -n 1)"
+  else
+    problem "$out"
+    finish policy-tests "tests/directory-policy.py failed with the gate under $BASH"
+  fi
+}
+
 check_ascii
 check_json
 check_yaml
@@ -587,6 +602,7 @@ check_frontmatter
 check_manifests
 check_plugin_limits
 check_directory_policy
+check_policy_tests
 check_workflows
 check_hook_tests bash
 # macOS ships bash 3.2 as /bin/bash, and the hook must run under it.

@@ -67,8 +67,9 @@ broken tree.
    All four must pass. `scripts/check.sh` runs the same checks as CI's
    `checks` job (ASCII, JSON and YAML parsing, shell syntax and shellcheck,
    skill and agent frontmatter, the manifests, the plugin folder limits, the
-   directory's file rules for `plugins/sutra`, the workflow compile, and
-   `tests/hooks.sh`) and exits non-zero on any failure. `check_manifests`
+   directory's file rules for `plugins/sutra` and their regression cases in
+   `tests/directory-policy.py`, the workflow compile, and `tests/hooks.sh`)
+   and exits non-zero on any failure. `check_manifests`
    passes here, because both manifests still carry the released version and
    `CHANGELOG.md` has its section. `--strict` fails on warnings, and
    `--profile directory` runs the subset of the plugin directory's checks the
