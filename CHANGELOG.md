@@ -6,6 +6,14 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `tests/directory-policy.py`, regression cases for `directory-policy` in
+  `scripts/check.sh`. It plants each rule's violations and near misses in a
+  clone of `HEAD`, one case at a time, and checks the gate's verdict and
+  message. `scripts/check.sh` runs it as `policy-tests`, and CI runs it again
+  under macOS bash 3.2.
+
 ## [0.3.3] - 2026-11-18
 
 ### Changed

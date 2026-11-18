@@ -168,6 +168,7 @@ sutra/
     workflows/<name>.workflow.js      # run as /sutra-harness:<meta.name>
   scripts/check.sh                    # the checks CI runs
   tests/hooks.sh                      # behavior tests for sutra.sh
+  tests/directory-policy.py           # regression cases for the directory gate
   docs/                               # install guide, profile guide, architect persona
   examples/                           # sample CLAUDE.md, AGENTS.md, settings, opt-in hooks
 ```
