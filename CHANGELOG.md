@@ -6,6 +6,15 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `docs/releasing.md` no longer says a merge to `main` starts a directory scan
+  at once. The repository's push webhook now answers that it is no longer
+  used, so the regular scan finds a merge within hours, and **Check for new
+  commits** starts it at once. The runbook also says to merge nothing else to
+  `main` until a release's scan result is in, because the directory scans the
+  newest commit there.
+
 ## [0.3.2] - 2026-11-18
 
 ### Changed

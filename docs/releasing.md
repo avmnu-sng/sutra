@@ -95,9 +95,13 @@ broken tree.
    validates only that branch. The directory first sees a release when step 7
    merges it, and step 11 reads the result.
 
-7. **Land it on `main`.** The directory follows `main`, and this repository's
-   push webhook starts a scan on each push there, so the merge starts a new
-   scan. If a version is with a reviewer, decide first whether to wait: the
+7. **Land it on `main`.** The directory follows `main` and finds the merge on
+   its regular scan, within hours, unless step 11 starts the scan at once. The
+   old push webhook on the repository no longer starts one; the Claude GitHub
+   App, installed on the repository and connected to the claude.ai
+   organization, would. The directory scans the newest commit on `main`, so
+   merge nothing else there until this release's result is in. If a version
+   is with a reviewer, decide first whether to wait: the
    portal docs do not say what a new commit does to a version in review, and
    on a plugin that was never published a failed security scan rejects the
    submission. Merge the release branch, then confirm
@@ -144,8 +148,9 @@ broken tree.
 11. **Re-check the directory listing.** Only `sutra` is submitted to
     Anthropic's plugin directory; `sutra-harness` ships hooks, which the
     directory accepts only from Verified organizations. On `sutra`'s page in
-    the developer portal (claude.ai/directory/manage), confirm the merge
-    commit is being scanned; if it is not, select **Check for new commits**.
+    the developer portal (claude.ai/directory/manage), select **Check for new
+    commits** so the directory scans the merge commit now rather than at its
+    next regular scan.
     The portal runs checks and a security scan the CLI cannot. Read the
     Versions tab and fix anything marked Blocks in the next release. Clear a
     **Policy hold** or a **Warning** too: a reviewer has to read every held
